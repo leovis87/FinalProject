@@ -1,0 +1,186 @@
+.App {
+  text-align: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.App-header {
+  padding: 20px;
+  color: white;
+}
+
+h1 {
+  margin-bottom: 20px;
+  font-size: 2.5em;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.status {
+  margin-bottom: 20px;
+  font-size: 1.2em;
+}
+
+.connected {
+  color: #4ade80;
+  font-weight: bold;
+}
+
+.disconnected {
+  color: #f87171;
+  font-weight: bold;
+}
+
+/* 연결 섹션 */
+.connect-section {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 30px;
+}
+
+/* 채팅 섹션 */
+.chat-section {
+  max-width: 800px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 15px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+/* 메시지 컨테이너 */
+.messages-container {
+  height: 400px;
+  overflow-y: auto;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 20px;
+  background: #f9fafb;
+  text-align: left;
+}
+
+/* 메시지 스타일 */
+.message {
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  line-height: 1.5;
+}
+
+.message.system {
+  background: #dbeafe;
+  color: #1e40af;
+  font-style: italic;
+}
+
+.message.echo {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.message.sent {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.message.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.timestamp {
+  color: #6b7280;
+  font-size: 0.85em;
+  margin-right: 5px;
+}
+
+.client-id {
+  font-weight: bold;
+  color: #4f46e5;
+}
+
+.original {
+  color: #9ca3af;
+  font-size: 0.9em;
+}
+
+/* 입력 섹션 */
+.input-section {
+  display: flex;
+  gap: 10px;
+}
+
+.input {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 1em;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+/* 버튼 */
+.button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1em;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.button.connect {
+  background: #4ade80;
+  color: white;
+}
+
+.button.connect:hover {
+  background: #22c55e;
+  transform: translateY(-2px);
+}
+
+.button.send {
+  background: #667eea;
+  color: white;
+}
+
+.button.send:hover {
+  background: #5568d3;
+  transform: translateY(-2px);
+}
+
+.button.disconnect {
+  background: #f87171;
+  color: white;
+}
+
+.button.disconnect:hover {
+  background: #ef4444;
+  transform: translateY(-2px);
+}
+
+/* 스크롤바 스타일 */
+.messages-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.messages-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
