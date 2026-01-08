@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Asta+Sans:wght@300..800&display=swap');
+
+:root {
+    /* 컬러 팔레트 */
+    --bg-color: #f9f8ff; /* 메인 배경색 */
+    --point-main-color: #1e3a8a; /* 포인트 메인 컬러 */
+    --point-sub-color: #8d8db9;
+
+    --font-white: #f9f8ff; /* 흰색 글씨 */
+
+    --logo-size: 11px;
+    --medium-size: 16px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Asta Sans", sans-serif;
+    font-weight: 500;
+    background-color: var(--bg-color);
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.debate-logo {
+    font-weight: 700;
+    font-size: var(--logo-size);
+    letter-spacing: -0.5px;
+    background: linear-gradient(90deg, #1E3A8A 0%, #7680DA 50%, #9FA6FF 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
