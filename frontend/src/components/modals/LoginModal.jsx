@@ -1,7 +1,7 @@
 import { RiKakaoTalkFill, RiCloseLine } from "react-icons/ri";
 import { SiNaver } from "react-icons/si";
 import Logo from "../Logo";
-import "../../styles/LoginModal.css"
+import "../../styles/Modal.css"
 
 function LoginModal({ onClose }) {
     const handleSocialLogin = (provider) => {
@@ -13,23 +13,23 @@ function LoginModal({ onClose }) {
     }
 
     return (
-        <div className="lm-overlay" onClick={onClose}>
-            <div className="lm-content" onClick={handleContentClick}>
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" onClick={handleContentClick}>
                 <button className="modal-close-btn" onClick={onClose}>
                     <RiCloseLine size={24} />
                 </button>
                 
-                <div className="lm-body">
+                <div className="modal-body">
                     <div className="modal-logo-wrapper">
                         <Logo />
                         <div className="logo-divider"></div>
                     </div>
 
-                    <div className="login-wrap">
-                        <h2>환영합니다!</h2>
-                        <p className="login-desc">SNS 계정으로 간편하게 시작하세요</p>
+                    <div className="modal-inner-content">
+                        <h2 className="modal-title">환영합니다!</h2>
+                        <p className="modal-desc">SNS 계정으로 간편하게 시작하세요</p>
                         
-                        <div className="social-login">
+                        <div className="social-login-area">
                             <button
                                 className="social-btn kakao-btn"
                                 onClick={() => handleSocialLogin('kakao')}

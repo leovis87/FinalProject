@@ -1,4 +1,5 @@
-.lm-overlay {
+/* --- 공통 모달 --- */
+.modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -12,18 +13,13 @@
     backdrop-filter: blur(5px);
 }
 
-.lm-content {
-    background-color: #fff;
-    width: 400px;
-    height: 550px;
+.modal-content {
+    background-color: #fff; width: 400px; max-width: 90vw;
+    height: auto; min-height: 200px; max-height: 90vh;
     border-radius: 20px;
-    overflow: hidden;
-    position: relative;
-    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
-    animation: slideUp 0.3s ease-out;
-    display: flex;
-    flex-direction: column;
-    padding: 40px;
+    overflow-y: auto; position: relative;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2); animation: slideUp 0.3s ease-out;
+    display: flex; flex-direction: column; padding: 40px;
 }
 
 @keyframes slideUp {
@@ -47,7 +43,7 @@
     color: #333;
 }
 
-.lm-body {
+.modal-body {
     display: flex;
     flex-direction: column;
     width: 100%;
@@ -56,6 +52,29 @@
     align-items: center;
 }
 
+/* 내부 콘텐츠 공통 (제목, 설명 등) */
+.modal-inner-content {
+    width: 100%;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.modal-title {
+    font-size: 26px;
+    color: #333;
+    margin-bottom: 10px;
+    font-weight: 800;
+}
+
+.modal-desc {
+    font-size: 15px;
+    color: #666;
+    margin-bottom: 40px;
+}
+
+/* --- 로그인 모달 --- */
 .modal-logo-wrapper {
     margin-bottom: 30px;
     transform: scale(1.2);
@@ -72,28 +91,7 @@
     border-radius: 1px;
 }
 
-.login-wrap {
-    width: 100%;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.login-wrap h2 {
-    font-size: 26px;
-    color: #333;
-    margin-bottom: 10px;
-    font-weight: 800;
-}
-
-.login-desc {
-    font-size: 15px;
-    color: #666;
-    margin-bottom: 40px;
-}
-
-.social-login {
+.social-login-area {
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -137,4 +135,40 @@
     line-height: 1.5;
     word-break: keep-all;
     text-align: center;
+}
+
+/* --- 닉네임 모달 --- */
+.nickname-form-area {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.nickname-input {
+    width: 100%;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+    margin-bottom: 10px;
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.nickname-input:focus {
+    border-color: #1e3a8a;
+}
+
+.error-msg {
+    color: #e74c3c;
+    font-size: 13px;
+    margin-bottom: 15px;
+    text-align: left;
+    padding-left: 5px;
+}
+
+.submit-btn {
+    background-color: #1e3a8a;
+    color: white;
+    margin-top: 10px;
 }

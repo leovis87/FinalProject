@@ -1,20 +1,24 @@
-/* 헤더 */
 .header {
     display: flex;
-    justify-content: center;
     align-items: center;
     height: 60px;
     background-color: var(--bg-color);
-    position: relative;
     padding: 0 40px;
     border-bottom: 1px solid transparent;
     transition: all 0.3s ease;
+    justify-content: center; 
 }
 
 .header.logged-in {
-    justify-content: space-between;
-    border-bottom: 1px solid #eee;
+    height: 90px;
     background-color: #fff;
+    border-bottom: 1px solid #eee;
+    justify-content: space-between;
+}
+
+.header-logo-center {
+    display: flex;
+    align-items: center;
 }
 
 .header-left {
@@ -22,34 +26,27 @@
     align-items: center;
 }
 
-.header-center {
-    display: flex;
-    gap: 40px;
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-}
-
-.header-center a {
-    font-size: 16px;
-    font-weight: 600;
-    color: #555;
-    text-decoration: none;
-    transition: color 0.2s;
-}
-
-.header-center a:hover {
-    color: var(--point-main-color);
-}
-
-.header-center a.active {
-    color: var(--point-main-color);
-    font-weight: 700;
-}
-
 .header-right {
     display: flex;
     align-items: center;
+}
+
+.user-nickname-display {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-family: sans-serif;
+}
+
+.welcome-text {
+    font-size: 14px;
+    color: #888;
+}
+
+.nickname-text {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--point-main-color);
 }
 
 .logout-btn {
@@ -70,12 +67,7 @@
 }
 
 @media (max-width: 768px) {
-    .header-center {
-        position: static;
-        transform: none;
-        gap: 20px;
-    }
-    .header.logged-in {
+    .header {
         padding: 0 20px;
     }
 }

@@ -2,17 +2,62 @@ import httpx
 import uuid
 import urllib.parse
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Response, Depends
+from fastapi import APIRouter, HTTPException, Response, Depends, Body
+from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.enums import AuthProvider
+from models.user import User
 from services.user import user_service
 from services.user_token import user_token_service
 from core.config import settings
 from core.database import get_db
 
 router = APIRouter(prefix='/api/users', tags=['사용자'])
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/users/login/kakao")
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    """현재 사용자 가져오기"""
+    user_id_str = user_token_service.verify_token_payload(token)
+    
+    if not user_id_str:
+        raise HTTPException(
+            status_code=401, 
+            detail="유효하지 않은 인증 정보입니다.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        
+    user = await user_service.get_by_id(db, int(user_id_str))
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+        
+    return user
+
+@router.get("/me")
+async def read_users_me(current_user: User = Depends(get_current_user)):
+    """내 정보 조회"""
+    return {
+        "user_id": current_user.user_id,
+        "name": current_user.name,
+        "email": current_user.email,
+        "nickname": current_user.nickname,
+        "provider": current_user.provider
+    }
+
+@router.patch("/me/nickname")
+async def update_nickname(
+    nickname: str = Body(..., embed=True),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """닉네임 설정"""
+    updated_user = await user_service.update_nickname(db, current_user.user_id, nickname)
+    return updated_user
 
 @router.get("/login/{provider}")
 async def social_login(provider: AuthProvider):

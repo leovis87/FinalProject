@@ -1,9 +1,9 @@
-import { Link, NavLink, useNavigate } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import Logo from "./Logo"
 import { useAuth } from "../contexts/AuthContext"
 
 function Header() {
-    const { isAuthenticated, logout } = useAuth();
+    const { isAuthenticated, logout, user } = useAuth();
     const navigate = useNavigate();
 
     const handleLogout = () => {
@@ -15,32 +15,25 @@ function Header() {
 
     return (
         <div className={`header ${isAuthenticated ? "logged-in" : ""}`}>
-            
-            <div className="header-left">
-                <Link to="/">
+            {isAuthenticated ? (
+                <>
+                    <div className="header-left">
+                        <div className="user-nickname-display">
+                            <span className="welcome-text">Welcome, </span>
+                            <span className="nickname-text">{user?.nickname || "Guest"}</span>
+                        </div>
+                    </div>
+
+                    <div className="header-right">
+                        <button className="logout-btn" onClick={handleLogout}>
+                            로그아웃
+                        </button>
+                    </div>
+                </>
+            ) : (
+                <Link to="/" className="header-logo-center">
                     <Logo />
                 </Link>
-            </div>
-
-            {isAuthenticated && (
-                <nav className="header-center">
-                    <NavLink 
-                        to="/" 
-                        className={({ isActive }) => isActive ? "active" : ""}
-                    >
-                        탐색
-                    </NavLink>
-                    <Link to="/nav1">목차1</Link>
-                    <Link to="/nav2">목차2</Link>
-                </nav>
-            )}
-
-            {isAuthenticated && (
-                <div className="header-right">
-                    <button className="logout-btn" onClick={handleLogout}>
-                        로그아웃
-                    </button>
-                </div>
             )}
         </div>
     )

@@ -39,4 +39,19 @@ class UserService:
 
         return new_user
     
+    async def get_by_id(self, db: AsyncSession, user_id: int) -> User | None:
+        """ID로 사용자 조회"""
+        query = select(User).where(User.user_id == user_id)
+        result = await db.execute(query)
+        return result.scalar_one_or_none()
+    
+    async def update_nickname(self, db: AsyncSession, user_id: int, nickname: str) -> User | None:
+        """닉네임 업데이트"""
+        user = await self.get_by_id(db, user_id)
+        if user:
+            user.nickname = nickname
+            await db.commit()
+            await db.refresh(user)
+        return user
+    
 user_service = UserService()
