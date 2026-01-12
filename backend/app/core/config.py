@@ -7,6 +7,10 @@ class Settings(BaseSettings):
 
     FRONTEND_URL: str
 
+    USER : str
+    PASSWORD : str
+    DB_NAME : str
+
     # Kakao
     KAKAO_CLIENT_ID: str
     KAKAO_CLIENT_SECRET: str
@@ -28,6 +32,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     REFRESH_TOKEN_EXPIRE_DAYS: int
+
+    # LLM API
+    GEMINI_API_KEY : str
 
     class Config:
         current_file_dir = os.path.dirname(os.path.abspath(__file__))

@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.lifespan import lifespan
-from routers import user, debate
+from routers import user, debate, rag
 
 app = FastAPI(lifespan=lifespan)
 
@@ -17,6 +17,7 @@ app.add_middleware(
 
 app.include_router(user.router)
 app.include_router(debate.router)
+app.include_router(rag.router)
 
 @app.get("/")
 def read_root():

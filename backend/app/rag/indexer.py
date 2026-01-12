@@ -1,7 +1,7 @@
 import csv, json, os
 import numpy as np
 import faiss
-from config import FAISS_INDEX_PATH, METAS_PATH
+from rag.rag_config import FAISS_INDEX_PATH, METAS_PATH
 
 def load_topics_csv(csv_path: str):
     docs = []

@@ -1,6 +1,9 @@
 import os
+from dotenv import load_dotenv
 
-ARTIFACT_DIR = os.getenv("ARTIFACT_DIR", "artifacts")
+load_dotenv()
+
+ARTIFACT_DIR = os.getenv("ARTIFACT_DIR", "rag/artifacts")
 DATA_CSV_PATH = os.getenv("DATA_CSV_PATH", "data/topics.csv")
 
 FAISS_INDEX_PATH = os.path.join(ARTIFACT_DIR, "faiss.index")
