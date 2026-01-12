@@ -1,8 +1,8 @@
 from pydantic import BaseModel, Field, field_validator, model_validator
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
-from models.enums import DebateCategory, DebateLevel, DebateStatus
+from models.enums import DebateCategory, DebateLevel, DebateStatus, DebateRole
 
 class DebateRoomCreate(BaseModel):
     title: str = Field(..., max_length=100, description="토론방 제목")
@@ -18,6 +18,8 @@ class DebateRoomCreate(BaseModel):
     max_users: int = Field(2, ge=2, le=6, description="최대 참여 인원")
     max_turns: int = Field(4, ge=4, le=20, description="총 라운드 수")
 
+    creator_role: DebateRole = Field(..., description="개설자의 역할 (PRO/CON/OBSERVER)")
+
     @model_validator(mode='after')
     def check_password_logic(self):
         is_private = self.is_private
@@ -30,6 +32,15 @@ class DebateRoomCreate(BaseModel):
             self.room_password = None
             
         return self
+    
+class DebateParticipantResponse(BaseModel):
+    user_id: int
+    role: DebateRole
+    turn_order: Optional[int] = None
+    nickname: str | None = None
+
+    class Config:
+        from_attributes = True
 
 class DebateRoomResponse(BaseModel):
     debate_room_id: int
@@ -46,6 +57,8 @@ class DebateRoomResponse(BaseModel):
     max_turns: int
     status: DebateStatus
     created_at: datetime
+
+    participants: List[DebateParticipantResponse] = []
     
     class Config:
         from_attributes = True

@@ -1,50 +1,284 @@
+/* 전체 컨테이너 */
 .debate-container {
     display: flex;
-    width: 100%;
+    width: 100vw;
     height: 100vh;
+    background-color: #f3f4f6;
     overflow: hidden;
 }
 
-.team-panel {
-    width: 320px;
-    height: 100%;
+.center-msg {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.2rem;
+    color: #666;
+}
+
+/* --- 왼쪽 사이드바 (팀 목록 통합) --- */
+.participants-sidebar {
+    width: 300px;
+    background-color: #fff;
+    border-right: 1px solid #e5e7eb;
     display: flex;
     flex-direction: column;
-    padding: 20px;
     flex-shrink: 0;
-    transition: all 0.3s ease;
+    z-index: 10;
+    box-shadow: 2px 0 15px rgba(0,0,0,0.03);
 }
 
-.team-panel.pro-team {
-    background-color: #eff6ff;
-    border-right: 1px solid #dbeafe;
-}
-
-.team-panel.con-team {
-    background-color: #fef2f2;
-    border-left: 1px solid #fee2e2;
-}
-
-.chat-area {
+/* 팀 섹션 (상하 분할) */
+.team-section {
     flex: 1;
-    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.team-section.pro {
+    background-color: #f8fafc;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.team-section.con {
+    background-color: #fef9f9;
+}
+
+/* 팀 헤더 카드 */
+.team-header-card {
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    background-color: rgba(255,255,255,0.5);
+    backdrop-filter: blur(5px);
+}
+
+.team-header-card h2 {
+    font-size: 16px;
+    font-weight: 800;
+    margin: 0;
+}
+
+.team-header-card.pro h2 { color: #1e40af; }
+.team-header-card.con h2 { color: #b91c1c; }
+
+.count-badge {
+    background-color: rgba(0,0,0,0.05);
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #555;
+}
+
+/* 참가자 리스트 */
+.user-list {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* 참가자 카드 */
+.participant-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background-color: #fff;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: transform 0.2s;
+}
+
+.participant-card.pro { border-color: #bfdbfe; }
+.participant-card.con { border-color: #fecaca; }
+
+.participant-card:hover {
+    transform: translateY(-2px);
+}
+
+.avatar-wrapper {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    overflow: hidden;
+    background-color: #eee;
+    flex-shrink: 0;
+}
+.avatar-wrapper img { width: 100%; height: 100%; object-fit: cover; }
+
+.participant-info { display: flex; flex-direction: column; }
+.participant-info .nickname { font-size: 14px; font-weight: 700; color: #333; }
+.participant-info .role-badge { font-size: 11px; color: #888; }
+
+.empty-slot {
+    text-align: center;
+    color: #aaa;
+    font-size: 12px;
+    margin-top: 20px;
+}
+
+/* --- 중앙 메인 영역 --- */
+.center-main-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     background-color: #fff;
     position: relative;
+    min-width: 500px;
+}
+
+/* 1. 상단 정보 헤더 */
+.debate-room-header {
+    padding: 15px 30px;
+    background-color: #fff;
+    border-bottom: 1px solid #e5e7eb;
     display: flex;
     flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
 }
 
-.team-header {
-    font-size: 20px;
+.header-top { display: flex; align-items: center; justify-content: space-between; }
+.room-title { font-size: 20px; font-weight: 800; color: #1f2937; margin: 0; }
+
+/* 토픽 박스 */
+.topic-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: #f8fafc;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+
+/* 카테고리 배지 */
+.category-badge {
+    font-size: 12px;
     font-weight: 800;
-    margin-bottom: 20px;
-    text-align: center;
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    background-color: #6b7280;
 }
 
-.pro-team .team-header {
-    color: #1e40af;
+/* 카테고리별 포인트 컬러 */
+.category-badge.korean { background-color: #ef4444; } /* 국어: 빨강 계열 */
+.category-badge.social { background-color: #10b981; } /* 사회: 초록 계열 */
+.category-badge.moral { background-color: #f59e0b; }  /* 도덕: 노랑 계열 */
+.category-badge.ethics { background-color: #8b5cf6; } /* 윤리: 보라 계열 */
+
+.topic-text { font-size: 16px; font-weight: 700; color: #333; }
+
+.topic-desc-box {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.4;
+    padding: 0 4px;
 }
 
-.con-team .team-header {
-    color: #b91c1c;
+/* 2. 사회자 멘트 영역 */
+.moderator-status-bar {
+    background: linear-gradient(90deg, #1e3a8a 0%, #3b5bdb 100%);
+    color: #fff;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    flex-shrink: 0;
+    z-index: 5;
 }
+
+.mod-icon { font-size: 24px; display: flex; align-items: center; }
+.mod-content { flex: 1; display: flex; flex-direction: column; }
+.mod-label { font-size: 11px; opacity: 0.9; font-weight: 600; margin-bottom: 2px; }
+.mod-text { font-size: 14px; font-weight: 500; margin: 0; }
+.mod-text .highlight { font-weight: 800; color: #fbbf24; }
+.timer-badge {
+    background-color: rgba(255,255,255,0.2);
+    padding: 6px 12px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+/* 3. 채팅 윈도우 */
+.chat-window {
+    flex: 1;
+    background-color: #f0f2f5;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.system-message { text-align: center; margin: 10px 0; }
+.system-message span {
+    background-color: rgba(0,0,0,0.05); color: #666;
+    font-size: 12px; padding: 4px 12px; border-radius: 12px;
+}
+
+/* 메시지 행 */
+.message-row { display: flex; align-items: flex-start; gap: 10px; max-width: 70%; }
+.message-row.me { align-self: flex-end; flex-direction: row-reverse; }
+.message-row.moderator { align-self: center; max-width: 80%; margin: 10px 0; }
+
+.msg-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    overflow: hidden; background-color: #fff; border: 1px solid #ddd;
+    display: flex; justify-content: center; align-items: center;
+}
+.msg-avatar img { width: 100%; height: 100%; }
+.msg-avatar.mod { background-color: #1e3a8a; color: #fff; border: none; }
+
+.msg-content { display: flex; flex-direction: column; gap: 4px; }
+.msg-name { font-size: 12px; color: #666; margin-left: 2px; }
+
+/* 말풍선 */
+.msg-bubble {
+    padding: 10px 14px; border-radius: 14px;
+    font-size: 14px; line-height: 1.5;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05); word-break: break-word;
+}
+.msg-bubble.pro { background-color: #fff; border: 1px solid #bfdbfe; border-top-left-radius: 2px; }
+.message-row.me .msg-bubble.pro { background-color: #eff6ff; border-top-left-radius: 14px; border-top-right-radius: 2px; }
+
+.msg-bubble.con { background-color: #fff; border: 1px solid #fecaca; border-top-left-radius: 2px; }
+.message-row.me .msg-bubble.con { background-color: #fef2f2; border-top-left-radius: 14px; border-top-right-radius: 2px; }
+
+.msg-bubble.mod {
+    background-color: #fff; border: 2px solid #1e3a8a;
+    color: #1e3a8a; font-weight: 600; text-align: center;
+}
+
+/* 4. 입력창 */
+.input-area {
+    padding: 20px; background-color: #fff;
+    border-top: 1px solid #e5e7eb; display: flex; gap: 10px;
+}
+.input-area input {
+    flex: 1; padding: 12px 16px; border-radius: 24px;
+    border: 1px solid #e5e7eb; background-color: #f9fafb; outline: none; transition: all 0.2s;
+}
+.input-area input:focus { background-color: #fff; border-color: #1e3a8a; }
+.send-btn {
+    width: 46px; height: 46px; border-radius: 50%; border: none;
+    background-color: #1e3a8a; color: #fff; font-size: 20px;
+    cursor: pointer; display: flex; justify-content: center; align-items: center;
+    transition: transform 0.2s;
+}
+.send-btn:hover:not(:disabled) { transform: scale(1.05); background-color: #2c50b5; }
+.send-btn:disabled { background-color: #cbd5e1; cursor: default; }

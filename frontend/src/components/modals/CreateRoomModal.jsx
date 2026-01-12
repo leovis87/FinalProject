@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import "../../styles/CreateRoomModal.css"
 
 function CreateRoomModal({ onClose }) {
+    const navigate = useNavigate();
+
     const [formData, setFormData] = useState({
         title: "",
         category: "korean",
@@ -10,7 +13,7 @@ function CreateRoomModal({ onClose }) {
         topic_description: "",
         level: "all",
         max_users: 2,
-        creator_side: "PRO", 
+        creator_role: "pro", 
         max_turns: 4,
         is_private: false,
         room_password: "",
@@ -33,8 +36,8 @@ function CreateRoomModal({ onClose }) {
         setFormData(prev => ({ ...prev, max_users: count }));
     };
 
-    const handleSideChange = (side) => {
-        setFormData(prev => ({ ...prev, creator_side: side }));
+    const handleRoleChange = (role) => {
+        setFormData(prev => ({ ...prev, creator_role: role }));
     };
 
     const validateForm = () => {
@@ -70,11 +73,20 @@ function CreateRoomModal({ onClose }) {
             });
 
             if (response.ok) {
+                const data = await response.json();
                 alert("토론방이 생성되었습니다!");
                 onClose();
+                navigate(`/debate/room/${data.debate_room_id}`);
             } else {
                 const errData = await response.json();
-                setError(errData.detail || "토론방 생성에 실패했습니다.");
+                if (Array.isArray(errData.detail)) {
+                    const errorMsg = errData.detail.map(err =>
+                        `${err.loc[err.loc.length - 1]}: ${err.msg}"`
+                    ).join('\n');
+                    setError(errorMsg);
+                } else {
+                    setError(errData.detail || "토론방 생성에 실패했습니다.");
+                }
             }
         } catch (err) {
             console.error(err);
@@ -193,15 +205,15 @@ function CreateRoomModal({ onClose }) {
                                     <div className="selection-group">
                                         <button 
                                             type="button" 
-                                            className={`selection-btn pro-btn ${formData.creator_side === 'PRO' ? 'selected' : ''}`}
-                                            onClick={() => handleSideChange('PRO')}
+                                            className={`selection-btn pro-btn ${formData.creator_role === 'pro' ? 'selected' : ''}`}
+                                            onClick={() => handleRoleChange('pro')}
                                         >
                                             찬성
                                         </button>
                                         <button 
                                             type="button" 
-                                            className={`selection-btn con-btn ${formData.creator_side === 'CON' ? 'selected' : ''}`}
-                                            onClick={() => handleSideChange('CON')}
+                                            className={`selection-btn con-btn ${formData.creator_role === 'con' ? 'selected' : ''}`}
+                                            onClick={() => handleRoleChange('con')}
                                         >
                                             반대
                                         </button>
