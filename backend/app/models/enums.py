@@ -2,6 +2,7 @@ import enum
 
 # 소셜 로그인
 class AuthProvider(str, enum.Enum):
+    TEST = "test"
     KAKAO = "kakao"
     NAVER = "naver"
 
@@ -29,3 +30,9 @@ class DebateStatus(str, enum.Enum):
     IN_PROGRESS_CONCLUSION = "in_progress_conclusion" # 최종 발언 중
     IN_PROGRESS_VOTING = "in_progress_voting"         # 평가 중
     FINISHED = "finished"               # 끝
+
+# 토론 진영
+class DebateRole(str, enum.Enum):
+    PRO = "pro"             # 찬성
+    CON = "con"             # 반대
+    OBSERVER = "observer"   # 관전자

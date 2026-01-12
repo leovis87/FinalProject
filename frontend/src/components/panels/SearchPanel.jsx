@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 import { 
     RiCloseLine, 
     RiSearchLine, 
@@ -10,6 +11,7 @@ import {
     RiUser3Line
 } from "react-icons/ri";
 import CreateRoomModal from "../modals/CreateRoomModal";
+import JoinRoomModal from "../modals/JoinRoomModal";
 import "../../styles/SlidePanel.css";
 import "../../styles/SearchPanel.css";
 
@@ -31,6 +33,7 @@ const CATEGORY_OPTIONS = [
 
 function SearchPanel({ isOpen, onClose }) {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     
     // 필터 상태 관리
@@ -43,6 +46,9 @@ function SearchPanel({ isOpen, onClose }) {
     // 토론방 데이터 상태
     const [debateRooms, setDebateRooms] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+
+    // 선택된 방
+    const [selectedJoinRoom, setSelectedJoinRoom] = useState(null);
 
     // 토론방 목록 불러오기
     useEffect(() => {
@@ -89,9 +95,16 @@ function SearchPanel({ isOpen, onClose }) {
         return true;
     });
 
-    const handleRoomClick = (roomId) => {
-        navigate(`/debate/room/${roomId}`);
-        onClose();
+    // 추후 한 번 나가면 다시 못들어오게 하는 로직으로 수정 필요
+    const handleRoomClick = (room) => {
+        const isParticipant = room.participants?.some(p => p.user_id === user?.user_id);
+
+        if (isParticipant) {
+            navigate(`/debate/room/${room.debate_room_id}`);
+            onClose();
+        } else {
+            setSelectedJoinRoom(room);
+        }
     };
 
     // --- 헬퍼 함수들 ---
@@ -207,7 +220,7 @@ function SearchPanel({ isOpen, onClose }) {
                                     <div
                                         key={room.debate_room_id}
                                         className="debate-room-card"
-                                        onClick={() => handleRoomClick(room.debate_room_id)}
+                                        onClick={() => handleRoomClick(room)}
                                     >
                                         {/* 1. 왼쪽: 상태, 제목, 논제 */}
                                         <div className="card-section left">
@@ -261,6 +274,13 @@ function SearchPanel({ isOpen, onClose }) {
 
             {isCreateModalOpen && (
                 <CreateRoomModal onClose={() => setIsCreateModalOpen(false)} />
+            )}
+
+            {selectedJoinRoom && (
+                <JoinRoomModal 
+                    room={selectedJoinRoom} 
+                    onClose={() => setSelectedJoinRoom(null)} 
+                />
             )}
         </div>
     );
