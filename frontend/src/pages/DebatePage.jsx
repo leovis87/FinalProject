@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { io } from "socket.io-client"; // ✅ socket.io-client 임포트
 import { RiSendPlaneFill, RiRobot2Line, RiTimerLine } from "react-icons/ri";
 import "../styles/DebatePage.css";
 
@@ -10,18 +11,13 @@ function DebatePage() {
     const [room, setRoom] = useState(null);
     const [error, setError] = useState("");
 
-    // 채팅 관련 상태 (더미 데이터)
+    // 채팅 관련 상태
     const [messageInput, setMessageInput] = useState("");
-    const [messages, setMessages] = useState([
-        { id: 1, type: "system", content: "토론방에 입장하셨습니다." },
-        { id: 2, type: "moderator", content: "지금부터 토론을 시작하겠습니다." },
-        { id: 3, role: "pro", nickname: "토론왕", content: "안녕하세요, 찬성 측 입론 시작하겠습니다." },
-        { id: 4, role: "con", nickname: "반대파", content: "반대 측입니다. 잘 부탁드립니다." },
-    ]);
-
+    const [messages, setMessages] = useState([]);
+    const socketRef = useRef(null); // ✅ Socket 객체를 유지하기 위한 Ref
     const chatEndRef = useRef(null);
 
-    // 방 정보 가져오기
+    // 1. 방 정보 가져오기 (REST API)
     useEffect(() => {
         const fetchRoom = async () => {
             try {
@@ -44,34 +40,79 @@ function DebatePage() {
         fetchRoom();
     }, [roomId]);
 
+    // 2. 🔹 Socket.io 연결 및 이벤트 리스너 설정
+    useEffect(() => {
+        if (!roomId) return;
+
+        // Socket.io 연결 시도 (백엔드 포트 8000)
+        const socket = io("http://localhost:8000", {
+            path: "/socket.io",
+            transports: ["websocket"], // 성능을 위해 웹소켓 전송 강제
+        });
+        socketRef.current = socket;
+
+        socket.on("connect", () => {
+            console.log("✅ Socket.io 연결 성공:", socket.id);
+            // 방 입장 이벤트 전송 (백엔드에서 sio.enter_room 처리를 위함)
+            socket.emit("join_debate", { room_id: roomId });
+            setMessages([{ id: 'sys-start', type: 'system', content: "토론 서버에 연결되었습니다." }]);
+        });
+
+        // 서버로부터 실시간 상태 업데이트 수신 (LangGraph의 State 데이터)
+        socket.on("debate_update", (data) => {
+            console.log("📩 서버 메시지 수신:", data);
+            if (data.messages) {
+                // LangGraph의 메시지 배열을 UI 형식에 맞춰 변환
+                const formatted = data.messages.map((m, idx) => ({
+                    id: `msg-${idx}`,
+                    role: m.role || 'moderator',
+                    nickname: m.user_name || (m.role === 'ai' ? 'AI 사회자' : '시스템'),
+                    content: m.content,
+                    type: m.role === 'ai' ? 'moderator' : (m.role === 'system' ? 'system' : 'user')
+                }));
+                setMessages(formatted);
+            }
+        });
+
+        socket.on("connect_error", (err) => {
+            console.error("❌ 연결 에러:", err);
+            setError("실시간 통신 연결에 실패했습니다.");
+        });
+
+        socket.on("disconnect", (reason) => {
+            console.log("❌ 연결 종료:", reason);
+        });
+
+        // 클린업: 컴포넌트 언마운트 시 연결 해제
+        return () => {
+            if (socket) socket.disconnect();
+        };
+    }, [roomId]);
+
     // 스크롤 자동 이동
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
+    // 3. 🔹 메시지 전송 로직
     const handleSendMessage = (e) => {
         e.preventDefault();
-        if (!messageInput.trim()) return;
+        if (!messageInput.trim() || !socketRef.current) return;
 
-        const newMessage = {
-            id: Date.now(),
-            role: "pro", // 테스트용
-            nickname: currentUser?.nickname || "나",
+        // 서버에 'send_message' 이벤트로 데이터 전송
+        socketRef.current.emit("send_message", {
+            room_id: roomId,
+            user_id: currentUser?.user_id,
+            user_name: currentUser?.nickname || "익명",
             content: messageInput
-        };
+        });
 
-        setMessages(prev => [...prev, newMessage]);
         setMessageInput("");
     };
 
     const getCategoryName = (catCode) => {
-        switch (catCode) {
-            case 'korean': return '국어';
-            case 'social': return '사회';
-            case 'moral': return '도덕';
-            case 'ethics': return '윤리';
-            default: return '기타';
-        }
+        const categories = { korean: '국어', social: '사회', moral: '도덕', ethics: '윤리' };
+        return categories[catCode] || '기타';
     };
 
     if (error) return <div className="debate-container center-msg">{error}</div>;
@@ -82,9 +123,8 @@ function DebatePage() {
 
     return (
         <div className="debate-container">
-            {/* --- 왼쪽 사이드바 (팀 목록) --- */}
+            {/* 왼쪽 사이드바 (참가자 목록) */}
             <aside className="participants-sidebar">
-                {/* 상단: 찬성 팀 */}
                 <div className="team-section pro">
                     <div className="team-header-card pro">
                         <h2>찬성 TEAM</h2>
@@ -94,10 +134,7 @@ function DebatePage() {
                         {proTeam.map((p) => (
                             <div key={p.user_id} className="participant-card pro">
                                 <div className="avatar-wrapper">
-                                    <img
-                                        src={`https://api.dicebear.com/9.x/notionists/svg?seed=${p.nickname}`}
-                                        alt={p.nickname}
-                                    />
+                                    <img src={`https://api.dicebear.com/9.x/notionists/svg?seed=${p.nickname}`} alt={p.nickname} />
                                 </div>
                                 <div className="participant-info">
                                     <span className="nickname">{p.nickname}</span>
@@ -105,11 +142,9 @@ function DebatePage() {
                                 </div>
                             </div>
                         ))}
-                        {proTeam.length === 0 && <div className="empty-slot">대기 중...</div>}
                     </div>
                 </div>
 
-                {/* 하단: 반대 팀 */}
                 <div className="team-section con">
                     <div className="team-header-card con">
                         <h2>반대 TEAM</h2>
@@ -119,10 +154,7 @@ function DebatePage() {
                         {conTeam.map((p) => (
                             <div key={p.user_id} className="participant-card con">
                                 <div className="avatar-wrapper">
-                                    <img
-                                        src={`https://api.dicebear.com/9.x/notionists/svg?seed=${p.nickname}`}
-                                        alt={p.nickname}
-                                    />
+                                    <img src={`https://api.dicebear.com/9.x/notionists/svg?seed=${p.nickname}`} alt={p.nickname} />
                                 </div>
                                 <div className="participant-info">
                                     <span className="nickname">{p.nickname}</span>
@@ -130,81 +162,52 @@ function DebatePage() {
                                 </div>
                             </div>
                         ))}
-                        {conTeam.length === 0 && <div className="empty-slot">대기 중...</div>}
                     </div>
                 </div>
             </aside>
 
-            {/* --- 중앙 메인 영역 --- */}
+            {/* 중앙 메인 영역 */}
             <main className="center-main-area">
-                {/* 1. 상단 정보 (제목/카테고리+논제/설명) */}
                 <header className="debate-room-header">
-                    <div className="header-top">
-                        <h1 className="room-title">{room.title}</h1>
-                    </div>
+                    <h1 className="room-title">{room.title}</h1>
                     <div className="topic-box">
-                        <span className={`category-badge ${room.category}`}>
-                            {getCategoryName(room.category)}
-                        </span>
+                        <span className={`category-badge ${room.category}`}>{getCategoryName(room.category)}</span>
                         <span className="topic-text">{room.topic}</span>
                     </div>
-                    {room.topic_description && (
-                        <div className="topic-desc-box">
-                            <p>{room.topic_description}</p>
-                        </div>
-                    )}
                 </header>
 
-                {/* 2. 사회자 멘트 영역 */}
+                {/* AI 사회자 상태 바 */}
                 <div className="moderator-status-bar">
-                    <div className="mod-icon">
-                        <RiRobot2Line />
-                    </div>
+                    <div className="mod-icon"><RiRobot2Line /></div>
                     <div className="mod-content">
                         <span className="mod-label">AI 사회자</span>
-                        <p className="mod-text">현재 <span className="highlight">찬성 측 입론</span> 단계입니다. 발언 시간은 3분입니다.</p>
+                        <p className="mod-text">실시간으로 토론을 분석하고 있습니다.</p>
                     </div>
-                    <div className="timer-badge">
-                        <RiTimerLine /> 02:59
-                    </div>
+                    <div className="timer-badge"><RiTimerLine /> 실시간</div>
                 </div>
 
-                {/* 3. 채팅 내역 */}
+                {/* 채팅 내역 영역 */}
                 <div className="chat-window">
                     {messages.map((msg) => {
-                        const isMe = msg.nickname === (currentUser?.nickname || "나");
-                        const isModerator = msg.type === 'moderator';
-                        const isSystem = msg.type === 'system';
-
-                        if (isSystem) {
-                            return <div key={msg.id} className="system-message"><span>{msg.content}</span></div>;
-                        }
-
-                        if (isModerator) {
-                            return (
-                                <div key={msg.id} className="message-row moderator">
-                                    <div className="msg-avatar mod">
-                                        <RiRobot2Line />
-                                    </div>
-                                    <div className="msg-bubble mod">
-                                        {msg.content}
-                                    </div>
-                                </div>
-                            );
-                        }
+                        const isMe = msg.nickname === currentUser?.nickname;
+                        if (msg.type === 'system') return <div key={msg.id} className="system-message"><span>{msg.content}</span></div>;
+                        if (msg.type === 'moderator') return (
+                            <div key={msg.id} className="message-row moderator">
+                                <div className="msg-avatar mod"><RiRobot2Line /></div>
+                                <div className="msg-bubble mod">{msg.content}</div>
+                            </div>
+                        );
 
                         return (
                             <div key={msg.id} className={`message-row ${msg.role} ${isMe ? 'me' : ''}`}>
                                 {!isMe && (
                                     <div className="msg-avatar">
-                                        <img src={`https://api.dicebear.com/9.x/notionists/svg?seed=${msg.nickname}`} alt="profile" />
+                                        <img src={`https://api.dicebear.com/9.x/notionists/svg?seed=${msg.nickname}`} alt="p" />
                                     </div>
                                 )}
                                 <div className="msg-content">
                                     {!isMe && <span className="msg-name">{msg.nickname}</span>}
-                                    <div className={`msg-bubble ${msg.role}`}>
-                                        {msg.content}
-                                    </div>
+                                    <div className={`msg-bubble ${msg.role}`}>{msg.content}</div>
                                 </div>
                             </div>
                         );
@@ -212,7 +215,7 @@ function DebatePage() {
                     <div ref={chatEndRef} />
                 </div>
 
-                {/* 4. 하단 입력창 */}
+                {/* 입력창 */}
                 <form className="input-area" onSubmit={handleSendMessage}>
                     <input
                         type="text"
