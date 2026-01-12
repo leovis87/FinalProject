@@ -164,21 +164,8 @@ workflow.add_edge('con_turn', 'referee_check_con')
 workflow.add_edge('referee_check_con', 'summary')
 
 # ============================================
-# Conditional Edge:
-#   - 🛠️ topic 추천 제어
-#   - loop 제어
-#   - 유/무료 제어
+# 분기 제어:
 # ============================================
-# Topic 추천 제어⚠️ 보류
-# workflow.add_conditional_edges(
-#     'check_topic',
-#     route_topic_check,
-#     {
-#         'valid': 'pro_turn',            # 통과하면 바로 토론 시작
-#         'invalid': 'recommend_topic'    # 실패 시 추천받기
-#     }
-# )
-
 # Loop 제어
 workflow.add_conditional_edges(
     'summary',                            # 출발 == 분기 시작점
@@ -299,7 +286,7 @@ if __name__ == '__main__':
     # 실행
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     result = debate_app.invoke(
-        initial_state,
+        initial_state,              # 방 생성시 필요한 내용들을 여기에 넣음.
         config = {
             'configurable': {
                 'thread_id': 'debate_room_001',
@@ -311,96 +298,3 @@ if __name__ == '__main__':
             'callbacks': [langfuse_handler]
         }
     )
-
-    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    # 결과 출력 (검증)
-    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    logging.info("📊 최종 결과 리포트")
-    
-    # 1. Referee 경고
-    if result.get('referee_warnings'):
-        logging.info("\n⚠️ Referee 경고 발생:")
-        for warning in result['referee_warnings']:
-            logging.warning(f"  - [턴 {warning['turn']}] {warning['user_name']}: {warning['message']}")
-    else:
-        logging.info("\n✅ Referee 경고 없음 (Clean Debate)")
-    
-    # 2. Moderator 공통 성적표 (Pydantic 객체 접근)
-    report = result.get('moderator_report')
-    if report:
-        logging.info("🤖 AI Moderator 종합 분석")
-        logging.info(f"📝 [총평]\n{report.general_summary}\n")
-        
-        logging.info(f"📊 [찬성 팀 점수]: {report.pro_eval.total_score}점")
-        logging.info(f"   - 피드백: {report.pro_eval.feedback_text}")
-        
-        logging.info(f"📊 [반대 팀 점수]: {report.con_eval.total_score}점")
-        logging.info(f"   - 피드백: {report.con_eval.feedback_text}")
-
-    # 3. Premium 심층 피드백
-    prem_feedbacks = result.get('premium_feedbacks', {})
-    if prem_feedbacks:
-        logging.info(f"💎 Premium 심층 코칭 ({len(prem_feedbacks)}명)")
-        
-        for uid, coaching in prem_feedbacks.items():
-            # coaching은 PersonalCoachingReport 객체
-            logging.info(f"\n👤 User: {uid}")
-
-            if isinstance(coaching, PersonalCoachingReport):
-                logging.info(f"  - 💪 강점: {', '.join(coaching.strength)}")
-                logging.info(f"  - 🔧 보완: {', '.join(coaching.weakness)}")
-                logging.info(f"  - 📚 추천: {coaching.recommended_reading}")
-
-                # 디테일 포인트
-                if coaching.detailed_points:
-                    logging.info("  [디테일 코칭]")
-                    for point in coaching.detailed_points:
-                        logging.info(f"    • 원문: '{point.original_text}' -> 조언: {point.critique}")
-
-            else:
-                logging.info(f"⚠️ 피드백 생성 데이터 오류: {coaching}") 
-                # coaching이 문자열(에러메시지)일 경우 내용을 출력하여 디버깅
-
-    else:
-        logging.info("\n💎 생성된 프리미엄 피드백이 없습니다.")
-
-    
-    end_time1 = time.time()
-    elapsed_test = end_time1 - start_time1
-    logging.info(f"⏱️ 총 소요 시간: {elapsed_test:.2f}초")
-
-# 📌 테스트 방법:
-# 
-# 1. 무료 모드 테스트:
-#    enable_personal_feedback = False
-#    → moderator_free만 실행
-# 
-# 2. 유료 모드 테스트:
-#    enable_personal_feedback = True
-#    → moderator_premium + 개인 피드백 병렬 실행
-# 
-# 3. 턴 수 조절:
-#    max_turns = 2  # 빠른 테스트
-#    max_turns = 3  # 실전
-
-# config 설정 참고
-# 사용 예시:
-#   result = app.invoke(
-#       input,
-#       config = {
-#
-#           # 1. 동적 설정 (Configurable Fields & Thread ID)
-#           'configurable': {
-#               'thread_id': 'debate_room_001',
-#
-#               # 👇 여기 부터 파라미터 config 추가
-#               'temp': 0.0,
-#               'model': CLAUDE_MODELS['opus_4_5'],
-#               'token': 2048,
-#               'is_stream': True
-#           },
-#
-#           # 2. 콜백 위치 (전역 설정)
-#           'callbacks': [langfuse_handler]
-#       }
-#   )

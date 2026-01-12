@@ -1761,24 +1761,3 @@ def moderator_chain_node(state: DebateState,
     return {
         'moderator_summary': result.content
     }
-
-
-
-
-# ============================================
-# 학습용
-# ============================================
-# JSON parsing (간단히 처리)
-# 💡 딱 봐도 실수하기 좋게 생김. 안쓰는게 좋음.
-
-# import json
-# try:
-#     # ```제거 후 parsing
-#     response_text = result.content.strip()
-#     if '```json' in response_text:
-#         response_text = response_text.split('```json')[1].split('```')[0]
-    
-#     elif '```' in response_text:
-#         response_text = response_text.split('```')[1].split('```')[0]
-    
-#     parsed = json.loads(response_text.strip())
