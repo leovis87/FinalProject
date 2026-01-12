@@ -1,6 +1,6 @@
 '''
 description:
-    - LLM 설정, 공통 도구, 환경 변수 설정
+    - LLM 설정, 공통 도구, 환경 변수 설정 (Tavily 전용 버전)
 '''
 import os
 import logging
@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 from langchain.agents import create_agent
 
 # LangChain Core
-from langchain_anthropic import ChatAnthropic # Claude 전용
 from langchain_google_genai import ChatGoogleGenerativeAI # Gemini 전용
 from langchain_google_genai import HarmBlockThreshold, HarmCategory # 안전 설정용 가드레일
 from langchain_openai import ChatOpenAI # OpenAI (Gemini용)
@@ -23,10 +22,10 @@ from langchain_core.runnables import (ConfigurableField, # ✅ LLM에 유연성 
                                       RunnableConfig)    # IDE 자동 완성 / 설정 관리
 from langchain_core.callbacks import StreamingStdOutCallbackHandler
 
-# LangChain Tools
-from langchain_community.tools.tavily_search import TavilySearchResults # Tavily를 이용한 검색 툴
-from langchain_community.utilities import DuckDuckGoSearchAPIWrapper # Duck을 이용한 검색 툴
-from langchain_community.tools import DuckDuckGoSearchResults # Duck 결과 출력 툴
+# ✅ 최신 langchain-tavily 클래스명으로 수정
+from langchain_tavily import TavilySearch 
+# ✅ 중앙 설정 객체 임포트 (경로 에러 방지를 위해 core.config 사용)
+from core.config import settings 
 
 load_dotenv()
 
@@ -34,23 +33,12 @@ load_dotenv()
 # ============================================
 # 🤖 Model mapping
 # ============================================
-# 지원 모델 맵
-CLAUDE_MODELS = {
-    "haiku_3_5": "claude-haiku-3-5-20241022",       # 26-02-19 만료 예정
-    "haiku_4_5": "claude-haiku-4-5-20251001",       # 26-10-15 만료 예정
-
-    "sonnet_3_5": "claude-sonnet-3-5-20241022",     # 25-10-28 만료 예정
-    "sonnet_3_7": "claude-3-7-sonnet-20250219",     # 26-02-19 만료 예정
-    "sonnet_4": "claude-sonnet-4-20250514",         # 26-05-14 만료 예정
-    "sonnet_4_5": "claude-sonnet-4-5-20250929",     # 미정
-
-    "opus_4": "claude-opus-4-20250514",             # 26-05-14 만료 예정
-    "opus_4_5": "claude-opus-4-5-20251101"          # 26-11-24 만료 예정
-}
+# ✅ nodes.py 에러 방지를 위해 빈 객체로 유지
+CLAUDE_MODELS = {}
 
 GEMINI_MODELS = {
-    "flash": "gemini-3-flash-preview",
-    "pro": "gemini-3-pro-preview"
+    "flash": "gemini-1.5-flash",
+    "pro": "gemini-1.5-pro"
 }
 
 
@@ -72,78 +60,30 @@ MAX_TOKENS = {
 
 # ============================================
 # 🔎 Set langchain tools
-#   - Wrapper 인스턴스 화
-#   - Tool 생성
 # ============================================
-# DuckDuckGoSearch
-duck_wrapper = DuckDuckGoSearchAPIWrapper(
-    region = 'ko-kr',    # 한국
-    time = 'd',          # 최근 하루
-    max_results = 3
-)
-
-# Duck searching tool 생성
-DUCK_SEARCH = DuckDuckGoSearchResults(api_wrapper = duck_wrapper)
-
-# Tavily searching tool 생성
-TAVILY_SEARCH = TavilySearchResults(
+# ✅ DuckDuckGo 제거 및 TavilySearch로 클래스명 수정
+TAVILY_SEARCH = TavilySearch(
     max_results = 3,
     topic = 'general',
     include_answer = True,      # AI 요약 포함
     search_depth = 'advanced',  # 'basic' 또는 'advanced'
 )
 
-# 📌 설명:
-# DuckDuckGoSearchRun = 웹 검색 도구
-# 무료로 사용 가능하지만 느림
-
 
 # ============================================
-# 2-1. 🤖 동적 설정이 가능한 메인 LLM (Claude)
-#   - invoke 시 config={'configurable': {'temp': 0.9}} 등으로 제어 가능
-#   - ⚠️ 직관적이진 않음. 사용 시 주의
+# 2-1. 🤖 Claude (삭제됨)
 # ============================================
-llm_c_configured = ChatAnthropic(
-    model = CLAUDE_MODELS["haiku_4_5"],
-    api_key = os.environ.get("ANTHROPIC_API_KEY"),
-    temperature = TEMPERATURE['checker'],
-    max_tokens = MAX_TOKENS['low'],
-    streaming = True
-).configurable_fields(
-    # 1. 왼쪽 변수명은 실제 클래스 인자 이름(temperature)이어야 함
-    temperature = ConfigurableField(
-        id = 'temp',                     # 중요: 실행 시 config에서 사용할 key
-        name = 'LLM Temperature',        # LangSmith/LangServe Ui용 이름
-        description = 'LLM의 창의성 설정' # UI용 설명
-    ),
-    # 2. 모델 설정
-    model = ConfigurableField(
-        id = 'model',
-        name = 'LLM model',
-        description = 'LLM의 모델 설정'
-    ),
-    # 3. 토큰 설정
-    max_tokens = ConfigurableField(
-        id = 'token',
-        name = 'LLM Max_tokens',
-        description = 'LLM의 Max 토큰 설정'
-    ),
-    # 4. stream 출력 설정
-    streaming = ConfigurableField(
-        id = 'is_stream',
-        name = 'LLM output',
-        description = 'LLM의 output 방식 설정'
-    )
-)
+# ✅ nodes.py 에러 방지를 위해 None으로 유지
+llm_c_configured = None
+
 
 # ============================================
 # 2-2. 🤖 동적 설정이 가능한 메인 LLM (Gemini)
-#   - invoke 시 config={'configurable': {'temp': 0.9}} 등으로 제어 가능
-#   - ⚠️ 직관적이진 않음. 사용 시 주의
 # ============================================
 llm_g_real_non_harm = ChatGoogleGenerativeAI(
     model = GEMINI_MODELS['flash'],
-    google_api_key = os.environ.get('GOOGLE_API_KEY'),
+    # ✅ os.environ 대신 settings 객체에서 API 키 참조
+    google_api_key = settings.GEMINI_API_KEY, 
     temperature = TEMPERATURE['checker'],
     streaming = True,
 
@@ -151,12 +91,6 @@ llm_g_real_non_harm = ChatGoogleGenerativeAI(
     top_p = 0.95, # Gemini 기본값
     top_k = 40,   # Gemini 기본값
     max_output_tokens = MAX_TOKENS['high'],
-    # 안전 설정 해제 (욕설도 읽어야 분석 가능)
-    # 📌 설명(차단 강도 (HarmBlockThreshold)):
-    #   - BLOCK_NONE: 차단 안함 => 💡 사회자/분석자용
-    #   - BLOCK_ONLY_HIGH: 매우 심한 내용만 차단 => 일반 챗본 (느슨)
-    #   - BLOCK_MEDIUM_AND_ABOVE: 중간 수위(Default값) => 일반 챗본 (보통)
-    #   - BLOCK_LOW_AND_ABOVE: 조금이라도 위험하면 차단 => 💡 어린이용 서비스
     safety_settings={
         HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
         HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -164,39 +98,26 @@ llm_g_real_non_harm = ChatGoogleGenerativeAI(
         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
     }
 ).configurable_fields(
-    # 1. 왼쪽 변수명은 실제 클래스 인자 이름(temperature)이어야 함
     temperature = ConfigurableField(
-        id = 'temp',                     # 중요: 실행 시 config에서 사용할 key
-        name = 'LLM Temperature',        # LangSmith/LangServe Ui용 이름
-        description = 'LLM의 창의성 설정' # UI용 설명
+        id = 'temp',
+        name = 'LLM Temperature',
+        description = 'LLM의 창의성 설정'
     ),
-    # 2. 모델 설정
     model = ConfigurableField(
         id = 'model',
         name = 'LLM model',
         description = 'LLM의 모델 설정'
     ),
-    # 3. 토큰 설정
     max_output_tokens = ConfigurableField(
         id = 'token',
         name = 'LLM Max_tokens',
         description = 'LLM의 Max 토큰 설정'
     ),
-    # 4. stream 출력 설정
     streaming = ConfigurableField(
         id = 'is_stream',
         name = 'LLM output',
         description = 'LLM의 output 방식 설정'
     ),
-    # 5. ai debator용 top_k, top_p 설정
-    # top_k: 확률 순위 ⭐ 상위 K개만 남기고 자름
-    #   - 40이 가장 성능이 좋음
-    # top_p: 확률 합계가 ⭐ **P%**가 될 때까지만 남기고 남기고 자름
-    #   - 논리적 일관성 안전장치 (0.9 ~ 0.95)
-    # temperature: 확률 분포를 평평하게(다양하게) or 뾰족하게(확실하게)
-    # 📌 설명:
-    #   - 창의적인 글쓰기나 자연스러운 대화를 원할 때는 Temperature를 높이고,
-    #   - Top_p로 안전장치를 거는 조합이 국룰(Standard).
     top_k = ConfigurableField(
         id = 'top_k',
         name = 'LLM top_k | lank K',
@@ -209,44 +130,25 @@ llm_g_real_non_harm = ChatGoogleGenerativeAI(
     )
 )
 
+# ✅ nodes.py 호환용 추가 변수
+llm_g_real_normal_harm = llm_g_real_non_harm
+
 # ============================================
 # 4. 헬퍼 함수
 # ============================================
 # Search tool 선택 함수
-def get_search_tool(use_tavily: bool = False):
+def get_search_tool(use_tavily: bool = True):
     """
     description:
         - 검색 tool 선택 함수
-    
-    Args:
-        - use_tavily: True == Tavily | False == DuckDuckGo
-    
-    Returns:
-        - 선택된 search tool
+        - DuckDuckGo가 제거되어 항상 Tavily를 사용합니다.
     """
-    if use_tavily:
-        logging.info('🔎 Tavily search tool 사용')
-        return TAVILY_SEARCH
-    
-    else:
-        logging.info('🔎 DuckDuckGo search tool 사용')
-        return DUCK_SEARCH
+    logging.info('🔎 Tavily search tool 사용 (DuckDuckGo 제거됨)')
+    return TAVILY_SEARCH
 
 # Config & Callback 재조립 함수
 def create_run_config(base_config: RunnableConfig,
                       is_structured_mode: bool = False) -> RunnableConfig:
-    '''
-    description:
-        - 실행용 config 생성 헬퍼
-        - is_structured_mode=True일 경우, 콘솔 출력 핸들러(StreamingStdOut)를 제외함 (에러 방지)
-    '''
-    # ============================================
-    # 🏗️ config 재설정 & Callback 재조립
-    #   1. 기존 config copy == config 복사본
-    #   2. 기존 callback copy == callback 복사본
-    #   3. config 복사본에 streming 핸들러 추가 == streming 모드 ON
-    #   4. callback 복사본에 config 복사본 추가
-    # ============================================
     # 1. Config 복사 (원본 보호)
     run_config = base_config.copy() if base_config else {}
     
@@ -268,7 +170,6 @@ def create_run_config(base_config: RunnableConfig,
             new_callbacks.append(existing_callbacks)
 
     # 4. 스트리밍 핸들러 추가
-    # 스트리밍이 켜져 있더라도, '구조화 모드(JSON)'이라면 콘솔 핸들러를 붙이지 않음
     if enable_streaming and not is_structured_mode:
         new_callbacks.append(StreamingStdOutCallbackHandler())
     

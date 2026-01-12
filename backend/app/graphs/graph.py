@@ -24,18 +24,14 @@ from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver # LangGraph용 Memory -> 자동 기억장치 (RAM)
 from langgraph.checkpoint.postgres import PostgresSaver # PostgreSQL용 Memory -> 자동 기억장치 (서버)
 
-# LangFuse
-from langfuse import get_client
-from langfuse.langchain import CallbackHandler
-
 # State, Pydantic
-from schemas import (
+from .schemas import (
     DebateState,
     TopicBriefing, PersonalCoachingReport
 )
 
 # Node, Func
-from nodes import (
+from .nodes import (
     analyze_topic_node, # Topic 설명 + 입론 2가지 추천
     pro_turn_node_user, pro_turn_node_ai, # 찬성측
     con_turn_node_user, con_turn_node_ai, # 반대측
@@ -49,7 +45,7 @@ from nodes import (
 )
 
 # 🛠️ Test 단계에서만 활용. 추후 삭제 예정
-from config import GEMINI_MODELS
+from .config import GEMINI_MODELS
 
 load_dotenv()
 
@@ -65,18 +61,6 @@ logging.basicConfig(
     encoding = 'utf-8'
 )
 
-# ============================================
-# 📊 LangFuse
-# ============================================
-# get_client 인스턴스 생성
-langfuse = get_client()
-
-# Langfuse CallbackHandler for Langchain (tracing)
-langfuse_handler = CallbackHandler()
-
-# public_key = os.environ.get("LANGFUSE_PUBLIC_KEY"),
-# secret_key = os.environ.get("LANGFUSE_SECRET_KEY"),
-# host = os.environ.get("LANGFUSE_BASE_URL")
 
 # ============================================
 # DB 설정
@@ -295,6 +279,6 @@ if __name__ == '__main__':
                 'token': 2048,
                 'is_stream': True
             },
-            'callbacks': [langfuse_handler]
+            'callbacks': []
         }
     )

@@ -9,7 +9,7 @@ function DebatePage() {
     const { user: currentUser } = useAuth();
     const [room, setRoom] = useState(null);
     const [error, setError] = useState("");
-    
+
     // 채팅 관련 상태 (더미 데이터)
     const [messageInput, setMessageInput] = useState("");
     const [messages, setMessages] = useState([
@@ -18,7 +18,7 @@ function DebatePage() {
         { id: 3, role: "pro", nickname: "토론왕", content: "안녕하세요, 찬성 측 입론 시작하겠습니다." },
         { id: 4, role: "con", nickname: "반대파", content: "반대 측입니다. 잘 부탁드립니다." },
     ]);
-    
+
     const chatEndRef = useRef(null);
 
     // 방 정보 가져오기
@@ -29,7 +29,7 @@ function DebatePage() {
                 const response = await fetch(`http://localhost:8000/api/debates/${roomId}`, {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
-                
+
                 if (response.ok) {
                     const data = await response.json();
                     setRoom(data);
@@ -52,20 +52,20 @@ function DebatePage() {
     const handleSendMessage = (e) => {
         e.preventDefault();
         if (!messageInput.trim()) return;
-        
+
         const newMessage = {
             id: Date.now(),
             role: "pro", // 테스트용
             nickname: currentUser?.nickname || "나",
             content: messageInput
         };
-        
+
         setMessages(prev => [...prev, newMessage]);
         setMessageInput("");
     };
 
     const getCategoryName = (catCode) => {
-        switch(catCode) {
+        switch (catCode) {
             case 'korean': return '국어';
             case 'social': return '사회';
             case 'moral': return '도덕';
@@ -94,7 +94,7 @@ function DebatePage() {
                         {proTeam.map((p) => (
                             <div key={p.user_id} className="participant-card pro">
                                 <div className="avatar-wrapper">
-                                    <img 
+                                    <img
                                         src={`https://api.dicebear.com/9.x/notionists/svg?seed=${p.nickname}`}
                                         alt={p.nickname}
                                     />
@@ -119,7 +119,7 @@ function DebatePage() {
                         {conTeam.map((p) => (
                             <div key={p.user_id} className="participant-card con">
                                 <div className="avatar-wrapper">
-                                    <img 
+                                    <img
                                         src={`https://api.dicebear.com/9.x/notionists/svg?seed=${p.nickname}`}
                                         alt={p.nickname}
                                     />
@@ -143,7 +143,6 @@ function DebatePage() {
                         <h1 className="room-title">{room.title}</h1>
                     </div>
                     <div className="topic-box">
-                        {/* 논제 배지 대신 카테고리 배지 사용 */}
                         <span className={`category-badge ${room.category}`}>
                             {getCategoryName(room.category)}
                         </span>

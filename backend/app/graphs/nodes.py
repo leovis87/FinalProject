@@ -20,14 +20,14 @@ import operator
 from dotenv import load_dotenv
 from datetime import datetime
 from typing import (Literal)
-from schemas import (
+from .schemas import (
     DebateState,
     TopicBriefing, RefereeDecision,
     ModeratorReport, PersonalCoachingReport
 )
-from config import (CLAUDE_MODELS, GEMINI_MODELS,
+from .config import (GEMINI_MODELS,
                     TEMPERATURE, MAX_TOKENS,
-                    DUCK_SEARCH, TAVILY_SEARCH,
+                    TAVILY_SEARCH,
                     llm_c_configured,
                     llm_g_real_non_harm, llm_g_real_normal_harm,
                     get_search_tool,
@@ -44,10 +44,6 @@ from langchain_google_genai import ChatGoogleGenerativeAI, HarmBlockThreshold, H
 from langchain.agents import create_agent
 from langchain_core.callbacks import StreamingStdOutCallbackHandler
 
-# LangFuse
-from langfuse import get_client
-from langfuse.langchain import CallbackHandler
-
 # LangGraph
 from langgraph.prebuilt import create_react_agent
 
@@ -57,20 +53,6 @@ load_dotenv()
 # logging 설정
 # ============================================
 logger = logging.getLogger('nodes')
-
-
-# ============================================
-# 📊 LangFuse
-# ============================================
-# get_client 인스턴스 생성
-langfuse = get_client()
-
-# Langfuse CallbackHandler for Langchain (tracing)
-langfuse_handler = CallbackHandler()
-
-# public_key = os.environ.get("LANGFUSE_PUBLIC_KEY"),
-# secret_key = os.environ.get("LANGFUSE_SECRET_KEY"),
-# host = os.environ.get("LANGFUSE_BASE_URL")
 
 
 # ============================================
