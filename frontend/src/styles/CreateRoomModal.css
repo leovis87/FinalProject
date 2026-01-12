@@ -1,0 +1,261 @@
+.create-modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    backdrop-filter: blur(2px);
+    background-color: rgba(0, 0, 0, 0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.create-modal {
+    background-color: #fff;
+    width: 800px;
+    max-width: 95%;
+    max-height: 85vh;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    position: relative;
+    animation: slideUp 0.3s ease-out;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 헤더 */
+.create-modal-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #fff;
+    padding: 20px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.create-modal-title {
+    color: #333;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+/* 폼 영역 */
+.create-room-form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.form-scroll-area {
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-columns {
+    display: flex;
+    gap: 40px;
+    align-items: flex-start;
+}
+
+.form-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
+}
+
+.create-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.create-form-group.row-group {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 40px;
+}
+
+.create-form-group label {
+    font-size: 14px;
+    font-weight: 700;
+    color: #555;
+    white-space: nowrap;
+}
+
+.create-form-group input[type="text"],
+.create-form-group input[type="password"],
+.create-form-group select,
+.create-form-group textarea {
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    background-color: #f9f9f9;
+    width: 100%;
+}
+
+.create-form-group input:focus,
+.create-form-group select:focus,
+.create-form-group textarea:focus {
+    border-color: var(--point-main-color);
+    background-color: #fff;
+}
+
+.textarea-group textarea {
+    resize: none;
+}
+
+/* --- 토글 스위치 --- */
+.text-toggle-switch {
+    position: relative;
+    width: 120px;
+    height: 36px;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.text-toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #e5e7eb;
+    border-radius: 36px;
+    transition: .4s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #666;
+    overflow: hidden;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 28px;
+    width: 28px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    border-radius: 50%;
+    transition: .4s;
+    z-index: 2;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.toggle-slider::after {
+    content: attr(data-off);
+    position: absolute;
+    right: 15px;
+    color: #666;
+    transition: 0.4s;
+}
+
+.text-toggle-switch input:checked + .toggle-slider {
+    background-color: var(--point-main-color);
+}
+
+.text-toggle-switch.observer input:checked + .toggle-slider {
+    background-color: #10b981; 
+}
+
+.text-toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(84px);
+}
+
+.text-toggle-switch input:checked + .toggle-slider::after {
+    content: attr(data-on);
+    color: white;
+    right: auto;
+    left: 15px;
+}
+
+/* --- 선택 버튼 그룹 (인원, 입장) --- */
+.selection-group {
+    display: flex;
+    gap: 10px;
+}
+
+.selection-btn {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    background-color: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    color: #777;
+    transition: all 0.2s;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.selection-btn.selected {
+    background-color: var(--point-main-color);
+    color: #fff;
+    border-color: var(--point-main-color);
+    box-shadow: 0 4px 10px rgba(30, 58, 138, 0.2);
+}
+
+/* --- 하단 버튼 영역 --- */
+.create-modal-footer {
+    display: flex;
+    height: 60px;
+    margin-top: auto;
+    border-top: 1px solid #eee;
+}
+
+.footer-btn {
+    flex: 1;
+    border: none;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.footer-btn.cancel {
+    background-color: #f3f4f6;
+    color: #374151;
+}
+
+.footer-btn.cancel:hover {
+    background-color: #e5e7eb;
+}
+
+.footer-btn.submit {
+    background-color: var(--point-main-color);
+    color: white;
+}
+
+.footer-btn.submit:hover {
+    filter: brightness(0.9);
+}
+
+.error-text {
+    color: #e74c3c;
+    font-size: 13px;
+    text-align: center;
+    margin-top: 10px;
+}
