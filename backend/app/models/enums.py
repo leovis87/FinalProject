@@ -11,7 +11,14 @@ class DebateLevel(str, enum.Enum):
     ELEMENTARY_HIGH = "elementary_high" # 초(고학년)
     MIDDLE = "middle"                   # 중
     HIGH = "high"                       # 고
-    ALL = "all"                         # 전부
+    ALL = "all"                         # 전체
+
+# 토론 과목 카테고리
+class DebateCategory(str, enum.Enum):
+    KOREAN = "korean"       # 국어
+    SOCIAL = "social"       # 사회
+    MORAL = "moral"         # 도덕
+    ETHICS = "ethics"       # 윤리
 
 # 토론방 상태
 class DebateStatus(str, enum.Enum):
