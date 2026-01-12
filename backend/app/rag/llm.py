@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()  # ⭐ 반드시 필요
 
 client = genai.Client(
-    api_key=os.environ.get("GEMINI_API_KEY", "")
+    api_key=GEMINI_API_KEY
 )
 
 TOPIC_GEN_SCHEMA = {
@@ -55,35 +55,40 @@ def generate_topics_with_gemini(
     model_name: str | None = None
 ):
     context = to_context(retrieved_docs)
-    model_name = model_name or GEMINI_MODEL
+    model_name = GEMINI_MODEL
 
     system = (
-        "너는 교육용 토론 주제 생성기다. "
-        "입력 조건(학년/과목/난이도/민감여부)을 반드시 지키고, "
-        "제공된 참고 후보들과 유사한 결로 새로운 주제를 생성하라."
+    "You are an educational debate topic generator. "
+    "You must strictly follow the given input conditions "
+    "(grade level, subject, difficulty range, and sensitivity allowance). "
+    "Using the provided reference candidates, generate NEW debate topics "
+    "that are similar in tone and structure but not copied. "
+    "All outputs MUST be written in Korean."
     )
 
     prompt = f"""
-[사용자 요청]
-{user_query}
+    [User Request]
+    {user_query}
 
-[조건]
-- level: {level}
-- subject: {subject}
-- difficulty: {diff_min}~{diff_max}
-- sensitive 허용: {allow_sensitive}
-- 생성 개수: {n_topics}
+    [Constraints]
+    - grade level: {level}
+    - subject: {subject}
+    - difficulty range: {diff_min} to {diff_max}
+    - sensitive topics allowed: {allow_sensitive}
+    - number of topics to generate: {n_topics}
 
-[참고 후보(RAG 검색 결과)]
-{context}
+    [Reference Candidates (RAG Search Results)]
+    {context}
 
-[생성 규칙]
-- topic_text는 찬반 토론이 가능하게 한 문장 형태로 작성
-- one_line_context는 학생이 바로 상황을 이해할 수 있게 1문장
-- keywords는 3~6개
-- sensitive는 조건에 맞게 설정
-- stance_clarity는 보통 true (애매하면 false)
-"""
+    [Generation Rules]
+    - Output MUST be written in Korean.
+    - topic_text must be a single Korean sentence that clearly allows a PRO vs CON debate.
+    - one_line_context must be one Korean sentence that helps students immediately understand the situation.
+    - keywords must be 3 to 6 Korean keywords.
+    - sensitive must be set according to the given condition.
+    - stance_clarity should usually be true; set it to false only if the topic is inherently ambiguous.
+    """
+    print(f'context :',context)
 
     resp = client.models.generate_content(
         model=model_name,
