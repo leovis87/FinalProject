@@ -39,3 +39,4 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     created_rooms = relationship("DebateRoom", back_populates="creator")
+    participations = relationship("DebateParticipant", back_populates="user", cascade="all, delete-orphan")
