@@ -344,5 +344,3 @@ class DebateState(TypedDict):
 # - pro_users, con_users: 각 팀 사용자 목록
 # - referee_warnings: 실시간 경고
 # - pro_feedbacks, con_feedbacks: 개인별 맞춤 피드백
-
-
