@@ -2,6 +2,7 @@ import enum
 
 # 소셜 로그인
 class AuthProvider(str, enum.Enum):
+    TEST = "test"
     KAKAO = "kakao"
     NAVER = "naver"
 
