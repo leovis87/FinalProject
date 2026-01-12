@@ -5,10 +5,13 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Response, Depends, Body
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List
 
 from models.enums import AuthProvider
 from models.user import User
+from schemas.user import UserRead, TestLoginRequest, Token
 from services.user import user_service
 from services.user_token import user_token_service
 from core.config import settings
@@ -38,16 +41,10 @@ async def get_current_user(
         
     return user
 
-@router.get("/me")
+@router.get("/me", response_model=UserRead)
 async def read_users_me(current_user: User = Depends(get_current_user)):
     """내 정보 조회"""
-    return {
-        "user_id": current_user.user_id,
-        "name": current_user.name,
-        "email": current_user.email,
-        "nickname": current_user.nickname,
-        "provider": current_user.provider
-    }
+    return current_user
 
 @router.patch("/me/nickname")
 async def update_nickname(
@@ -58,6 +55,62 @@ async def update_nickname(
     """닉네임 설정"""
     updated_user = await user_service.update_nickname(db, current_user.user_id, nickname)
     return updated_user
+
+# --- 테스트 전용 ---
+@router.get("/test-users", response_model=List[UserRead])
+async def get_test_users(db: AsyncSession = Depends(get_db)):
+    """
+    [개발용] 로그인 가능한 테스트 유저 목록 조회
+    """
+    query = select(User).where(User.provider == AuthProvider.TEST)
+    result = await db.execute(query)
+    users = result.scalars().all()
+    return users
+
+@router.post("/login/test", response_model=Token)
+async def test_login(
+    body: TestLoginRequest, 
+    response: Response, 
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    [개발용] 테스트 계정 로그인
+    """
+    # 1. 이메일로 테스트 유저 조회
+    query = select(User).where(
+        User.provider == AuthProvider.TEST,
+        User.email == body.email
+    )
+    result = await db.execute(query)
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="해당 이메일의 테스트 유저가 없습니다.")
+
+    # 2. 토큰 발급
+    access_token = user_token_service.create_access_token(user.user_id)
+    refresh_token = user_token_service.create_refresh_token(user.user_id)
+    
+    await user_token_service.update_refresh_token(db, user.user_id, refresh_token)
+
+    # 3. 쿠키 설정
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=False,
+        samesite="Lax",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path="/"
+    )
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user_info": user
+    }
+
+# --- 테스트 전용 끝 ---
 
 @router.get("/login/{provider}")
 async def social_login(provider: AuthProvider):
@@ -192,6 +245,7 @@ async def social_callback(
         provider=provider,
         provider_user_id=social_id,
         name=name,
+        nickname=None,
         email=email,
         phone_number=phone_number,
         birth_date=birth_date_obj,
