@@ -1,9 +1,14 @@
 import os, json
 from google import genai
 from google.genai import types
-from config import GEMINI_API_KEY, GEMINI_MODEL
+from rag.rag_config import GEMINI_API_KEY, GEMINI_MODEL
+from dotenv import load_dotenv
 
-client = genai.Client(api_key=GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", ""))
+load_dotenv()  # ⭐ 반드시 필요
+
+client = genai.Client(
+    api_key=os.environ.get("GEMINI_API_KEY", "")
+)
 
 TOPIC_GEN_SCHEMA = {
     "type": "object",
