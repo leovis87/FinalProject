@@ -38,4 +38,4 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    # created_rooms = relationship("DebateRoom", back_populates="creator")
+    created_rooms = relationship("DebateRoom", back_populates="creator")

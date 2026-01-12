@@ -1,0 +1,264 @@
+.home-container {
+    display: flex;
+    height: calc(100vh - 106px);
+    position: relative;
+    overflow: hidden;
+}
+
+.lobby-bg-decoration {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.circle-shape {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.4;
+}
+
+.shape-2 {
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, #8d8db9 0%, transparent 70%);
+    bottom: -150px;
+    left: -100px;
+    animation: pulse 10s infinite alternate-reverse;
+}
+
+@keyframes pulse {
+    from {
+        transform: scale(1);
+        opacity: 0.3;
+    }
+    to {
+        transform: scale(1.1);
+        opacity: 0.5;
+    }
+}
+
+/* 왼쪽 사이드바 */
+.sidebar-left {
+    width: 350px;
+    padding-top: 100px;
+    padding-left: 70px;
+    z-index: 10;
+}
+
+.floating-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+}
+
+.nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    padding: 20px 32px;
+
+    border-radius: 60px;
+    cursor: pointer;
+
+    background: linear-gradient(
+        145deg,
+        rgba(255,255,255,0.95),
+        rgba(240,243,255,0.85)
+    );
+
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(30,58,138,0.12);
+
+    box-shadow:
+        0 18px 40px rgba(30,58,138,0.15),
+        inset 0 2px 0 rgba(255,255,255,0.9),
+        inset 0 -1px 0 rgba(30,58,138,0.05);
+
+    color: #1f2937;
+    position: relative;
+    overflow: hidden;
+
+    transition: 
+        transform 0.3s ease,
+        box-shadow 0.3s ease;
+}
+
+.nav-btn.main {
+    background: linear-gradient(
+        145deg,
+        #ffffff,
+        #e8ecff
+    );
+}
+
+.nav-btn.sub {
+    width: 250px;
+    opacity: 0.92;
+}
+
+.nav-icon-wrapper {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 28px;
+    color: #1e3a8a;
+
+    background: linear-gradient(
+        145deg,
+        rgba(255,255,255,0.9),
+        rgba(225,232,255,0.9)
+    );
+
+    box-shadow:
+        0 10px 20px rgba(30,58,138,0.25),
+        inset 0 1px 0 rgba(255,255,255,0.8);
+
+    transition: all 0.3s ease;
+}
+
+.nav-text {
+    font-size: 25px;
+    font-weight: 900;
+    letter-spacing: -0.6px;
+}
+
+.nav-text.sub {
+    font-size: 22px;
+    font-weight: 800;
+}
+
+.nav-btn:hover {
+    transform: translateX(18px) translateY(-4px);
+    box-shadow:
+        0 30px 60px rgba(30,58,138,0.25),
+        inset 0 2px 0 rgba(255,255,255,1);
+}
+
+.nav-btn:hover .nav-icon-wrapper {
+    background: linear-gradient(
+        145deg,
+        #1e3a8a,
+        #2c4ed8
+    );
+    color: #ffffff;
+    box-shadow:
+        0 14px 35px rgba(30,58,138,0.55);
+}
+
+.nav-btn:hover .nav-text {
+    color: #1e3a8a;
+}
+
+.nav-btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    left: -130%;
+    background: linear-gradient(
+        120deg,
+        transparent,
+        rgba(255,255,255,0.7),
+        transparent
+    );
+    transition: left 0.8s ease;
+}
+
+.nav-btn:hover::after {
+    left: 130%;
+}
+
+.nav-btn:active {
+    transform: translateX(16px) translateY(-1px) scale(0.97);
+}
+
+/* 중앙 */
+.center-area {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+}
+
+.character-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    gap: 20px;
+}
+
+.character-spotlight {
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(
+        circle,
+        rgba(30, 58, 138, 0.2),
+        transparent 70%
+    );
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -60%);
+    border-radius: 50%;
+    z-index: -1;
+}
+
+.character-wrapper {
+    width: 420px;
+    height: 420px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.character-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 20px 20px rgba(0, 0, 0, 0.15));
+}
+
+.nickname-badge {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 25px;
+    border-radius: 50px;
+
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(5px);
+
+    transform: translateY(-20px);
+}
+
+.level-badge {
+    background: #1e3a8a;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.user-nickname {
+    font-size: 22px;
+    font-weight: 800;
+    color: #333;
+}
+
+/* 오른쪽 사이드바 */
+.sidebar-right {
+    background-color: #fff;
+    width: 350px;
+    z-index: 5;
+}

@@ -1,4 +1,6 @@
 import { Link, useNavigate } from "react-router-dom"
+import { RiVipCrown2Fill } from "react-icons/ri";
+import { MdLogout } from "react-icons/md";
 import Logo from "./Logo"
 import { useAuth } from "../contexts/AuthContext"
 
@@ -17,17 +19,39 @@ function Header() {
         <div className={`header ${isAuthenticated ? "logged-in" : ""}`}>
             {isAuthenticated ? (
                 <>
-                    <div className="header-left">
-                        <div className="user-nickname-display">
-                            <span className="welcome-text">Welcome, </span>
-                            <span className="nickname-text">{user?.nickname || "Guest"}</span>
+                    <div className="header-left-profile">
+                        <div className="profile-avatar">
+                            <img 
+                                src={`https://api.dicebear.com/9.x/notionists/svg?seed=${user?.nickname || 'User'}&backgroundColor=transparent`} 
+                                alt="Profile"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                            />
+                        </div>
+                        <div className="profile-info">
+                            <div className="profile-name">{user?.nickname || "Guest"}</div>
+                            {/* 레벨은 추후 기능 연결 */}
+                            <div className="level-bar-container">
+                                <div className="level-divider"></div>
+                                <span className="level-text">레벨 1</span>
+                                <div className="progress-track">
+                                    <div className="progress-fill"></div>
+                                    <span className="xp-overlay">0 / 100</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="header-right">
-                        <button className="logout-btn" onClick={handleLogout}>
-                            로그아웃
-                        </button>
+                    <div className="header-right-tools">
+                        <div className="resource-display">
+                            <div className="resource-item">
+                                <RiVipCrown2Fill color="#a855f7" size={25} />
+                                <span className="resource-count" style={{color: '#a855f7'}}>0</span>
+                            </div>
+                        </div>
+
+                        <div className="icon-actions">
+                            <button className="icon-btn" onClick={handleLogout}><MdLogout size={25} /></button>
+                        </div>
                     </div>
                 </>
             ) : (
