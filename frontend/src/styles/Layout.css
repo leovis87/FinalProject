@@ -1,0 +1,190 @@
+/* 헤더 */
+.header {
+    display: flex;
+    align-items: center;
+    height: 60px;
+    background-color: var(--bg-color);
+    padding: 0 40px;
+    transition: all 0.3s ease;
+    justify-content: center;
+    z-index: 100;
+    position: relative;
+}
+
+.header.logged-in {
+    height: auto;
+    background-color: #fff;
+    border-bottom: 1px solid #e5e7eb;
+    justify-content: space-between;
+    padding: 20px 30px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.header-left-profile {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.profile-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: #f3f4f6;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 1px solid #e5e7eb;
+}
+
+.profile-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.profile-name {
+    font-size: 30px;
+    font-weight: 800;
+    color: #1f2937;
+}
+
+.level-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    color: #9ca3af;
+}
+
+.level-divider {
+    width: 3px;
+    height: 16px;
+    background-color: #d1d5db;
+    margin-right: 2px;
+}
+
+.progress-track {
+    width: 350px;
+    height: 25px;
+    background-color: #f3f4f6;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: #7bb6b3;
+    border-radius: 8px;
+    width: 0%;
+}
+
+.xp-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #555;
+    z-index: 2;
+    line-height: 1;
+}
+
+.header-right-tools {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+}
+
+.resource-display {
+    display: flex;
+    gap: 20px;
+    background-color: #fff;
+}
+
+.resource-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    font-size: 18px;
+}
+
+.icon-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.icon-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 3px solid #f3f4f6;
+    background-color: white;
+    color: #6b7280;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: all 0.2s;
+}
+
+.icon-btn:hover {
+    background-color: #f9fafb;
+    color: #111;
+    border-color: #e5e7eb;
+}
+
+.header-logo-center {
+    display: flex;
+    align-items: center;
+}
+
+@media (max-width: 768px) {
+    .header {
+        padding: 0 20px;
+    }
+}
+
+/* 푸터 */
+.footer {
+    background-color: #222;
+    color: #888;
+    padding: 60px 20px;
+    font-size: 14px;
+    margin-top: auto;
+}
+
+.footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.footer-links {
+    display: flex;
+    gap: 20px;
+}
+
+.footer-links a {
+    color: #ccc;
+    transition: color 0.2s;
+}
+
+.footer-links a:hover {
+    color: #fff;
+    text-decoration: underline;
+}
+
+.footer-info p {
+    margin-bottom: 8px;
+    line-height: 1.5;
+}

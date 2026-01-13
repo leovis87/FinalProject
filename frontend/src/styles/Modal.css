@@ -1,0 +1,174 @@
+/* --- 공통 모달 --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+}
+
+.modal-content {
+    background-color: #fff; width: 400px; max-width: 90vw;
+    height: auto; min-height: 200px; max-height: 90vh;
+    border-radius: 20px;
+    overflow-y: auto; position: relative;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2); animation: slideUp 0.3s ease-out;
+    display: flex; flex-direction: column; padding: 40px;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.modal-close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #999;
+    z-index: 20;
+    transition: color 0.2s;
+}
+
+.modal-close-btn:hover {
+    color: #333;
+}
+
+.modal-body {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 내부 콘텐츠 공통 (제목, 설명 등) */
+.modal-inner-content {
+    width: 100%;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.modal-title {
+    font-size: 26px;
+    color: #333;
+    margin-bottom: 10px;
+    font-weight: 800;
+}
+
+.modal-desc {
+    font-size: 15px;
+    color: #666;
+    margin-bottom: 40px;
+}
+
+/* --- 로그인 모달 --- */
+.modal-logo-wrapper {
+    margin-bottom: 30px;
+    transform: scale(1.2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.logo-divider {
+    width: 30px;
+    height: 2px;
+    background-color: #e5e7eb;
+    border-radius: 1px;
+}
+
+.social-login-area {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 30px;
+}
+
+.social-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 14px 0;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.social-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.kakao-btn {
+    background-color: #FEE500;
+    color: #391B1B;
+}
+
+.naver-btn {
+    background-color: #03C75A;
+    color: #fff;
+}
+
+.login-agreement {
+    font-size: 12px;
+    color: #aaa;
+    line-height: 1.5;
+    word-break: keep-all;
+    text-align: center;
+}
+
+/* --- 닉네임 모달 --- */
+.nickname-form-area {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.nickname-input {
+    width: 100%;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+    margin-bottom: 10px;
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.nickname-input:focus {
+    border-color: #1e3a8a;
+}
+
+.error-msg {
+    color: #e74c3c;
+    font-size: 13px;
+    margin-bottom: 15px;
+    text-align: left;
+    padding-left: 5px;
+}
+
+.submit-btn {
+    background-color: #1e3a8a;
+    color: white;
+    margin-top: 10px;
+}
