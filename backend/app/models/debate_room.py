@@ -53,3 +53,4 @@ class DebateRoom(Base):
     finished_at = Column(DateTime(timezone=True), nullable=True)
 
     creator = relationship("User", back_populates="created_rooms")
+    participants = relationship("DebateParticipant", back_populates="debate_room", cascade="all, delete-orphan")
