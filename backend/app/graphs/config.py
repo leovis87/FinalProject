@@ -10,23 +10,16 @@ from dotenv import load_dotenv
 from langchain.agents import create_agent
 
 # LangChain Core
-from langchain_anthropic import ChatAnthropic # Claude 전용
 from langchain_google_genai import ChatGoogleGenerativeAI # Gemini 전용
 from langchain_google_genai import HarmBlockThreshold, HarmCategory # 안전 설정용 가드레일
-from langchain_openai import ChatOpenAI # OpenAI (Gemini용)
-from langchain_core.prompts import (ChatPromptTemplate, # Chain LLM용 prompt
-                                    SystemMessagePromptTemplate, # Caching
-                                    MessagesPlaceholder) # Chain용 prompt, memory
-from langchain_core.messages import HumanMessage, AIMessage # 수동 기억장치 (history)
-from langchain_core.messages import SystemMessage # ✅ Prompt Caching 활성화
-from langchain_core.runnables import (ConfigurableField, # ✅ LLM에 유연성 부여
-                                      RunnableConfig)    # IDE 자동 완성 / 설정 관리
+from langchain_core.runnables import (
+    ConfigurableField, # ✅ LLM에 유연성 부여
+    RunnableConfig     # IDE 자동 완성 / 설정 관리
+)    
 from langchain_core.callbacks import StreamingStdOutCallbackHandler
 
 # LangChain Tools
 from langchain_community.tools.tavily_search import TavilySearchResults # Tavily를 이용한 검색 툴
-from langchain_community.utilities import DuckDuckGoSearchAPIWrapper # Duck을 이용한 검색 툴
-from langchain_community.tools import DuckDuckGoSearchResults # Duck 결과 출력 툴
 
 load_dotenv()
 
@@ -35,19 +28,6 @@ load_dotenv()
 # 🤖 Model mapping
 # ============================================
 # 지원 모델 맵
-CLAUDE_MODELS = {
-    "haiku_3_5": "claude-haiku-3-5-20241022",       # 26-02-19 만료 예정
-    "haiku_4_5": "claude-haiku-4-5-20251001",       # 26-10-15 만료 예정
-
-    "sonnet_3_5": "claude-sonnet-3-5-20241022",     # 25-10-28 만료 예정
-    "sonnet_3_7": "claude-3-7-sonnet-20250219",     # 26-02-19 만료 예정
-    "sonnet_4": "claude-sonnet-4-20250514",         # 26-05-14 만료 예정
-    "sonnet_4_5": "claude-sonnet-4-5-20250929",     # 미정
-
-    "opus_4": "claude-opus-4-20250514",             # 26-05-14 만료 예정
-    "opus_4_5": "claude-opus-4-5-20251101"          # 26-11-24 만료 예정
-}
-
 GEMINI_MODELS = {
     "flash": "gemini-3-flash-preview",
     "pro": "gemini-3-pro-preview"
@@ -72,19 +52,8 @@ MAX_TOKENS = {
 
 # ============================================
 # 🔎 Set langchain tools
-#   - Wrapper 인스턴스 화
 #   - Tool 생성
 # ============================================
-# DuckDuckGoSearch
-duck_wrapper = DuckDuckGoSearchAPIWrapper(
-    region = 'ko-kr',    # 한국
-    time = 'd',          # 최근 하루
-    max_results = 3
-)
-
-# Duck searching tool 생성
-DUCK_SEARCH = DuckDuckGoSearchResults(api_wrapper = duck_wrapper)
-
 # Tavily searching tool 생성
 TAVILY_SEARCH = TavilySearchResults(
     max_results = 3,
@@ -93,51 +62,9 @@ TAVILY_SEARCH = TavilySearchResults(
     search_depth = 'advanced',  # 'basic' 또는 'advanced'
 )
 
-# 📌 설명:
-# DuckDuckGoSearchRun = 웹 검색 도구
-# 무료로 사용 가능하지만 느림
-
 
 # ============================================
-# 2-1. 🤖 동적 설정이 가능한 메인 LLM (Claude)
-#   - invoke 시 config={'configurable': {'temp': 0.9}} 등으로 제어 가능
-#   - ⚠️ 직관적이진 않음. 사용 시 주의
-# ============================================
-llm_c_configured = ChatAnthropic(
-    model = CLAUDE_MODELS["haiku_4_5"],
-    api_key = os.environ.get("ANTHROPIC_API_KEY"),
-    temperature = TEMPERATURE['checker'],
-    max_tokens = MAX_TOKENS['low'],
-    streaming = True
-).configurable_fields(
-    # 1. 왼쪽 변수명은 실제 클래스 인자 이름(temperature)이어야 함
-    temperature = ConfigurableField(
-        id = 'temp',                     # 중요: 실행 시 config에서 사용할 key
-        name = 'LLM Temperature',        # LangSmith/LangServe Ui용 이름
-        description = 'LLM의 창의성 설정' # UI용 설명
-    ),
-    # 2. 모델 설정
-    model = ConfigurableField(
-        id = 'model',
-        name = 'LLM model',
-        description = 'LLM의 모델 설정'
-    ),
-    # 3. 토큰 설정
-    max_tokens = ConfigurableField(
-        id = 'token',
-        name = 'LLM Max_tokens',
-        description = 'LLM의 Max 토큰 설정'
-    ),
-    # 4. stream 출력 설정
-    streaming = ConfigurableField(
-        id = 'is_stream',
-        name = 'LLM output',
-        description = 'LLM의 output 방식 설정'
-    )
-)
-
-# ============================================
-# 2-2. 🤖 동적 설정이 가능한 메인 LLM (Gemini)
+# 2. 🤖 동적 설정이 가능한 메인 LLM (Gemini)
 #   - invoke 시 config={'configurable': {'temp': 0.9}} 등으로 제어 가능
 #   - ⚠️ 직관적이진 않음. 사용 시 주의
 # ============================================
@@ -227,10 +154,7 @@ def get_search_tool(use_tavily: bool = False):
     if use_tavily:
         logging.info('🔎 Tavily search tool 사용')
         return TAVILY_SEARCH
-    
-    else:
-        logging.info('🔎 DuckDuckGo search tool 사용')
-        return DUCK_SEARCH
+
 
 # Config & Callback 재조립 함수
 def create_run_config(base_config: RunnableConfig,
