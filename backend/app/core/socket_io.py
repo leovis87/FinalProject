@@ -39,7 +39,11 @@ async def handle_join(sid, data):
                 participants = part_result.scalars().all()
 
                 config = {"configurable": {"thread_id": f"debate_{room_id}"}}
-                
+                for i in participants:
+                    if i.role == "pro":
+                        print(i.user_id)
+                    else: 
+                        print(i.user_id)
                 initial_state = {
                     "topic": room.topic,
                     "pro_users": [
@@ -50,6 +54,7 @@ async def handle_join(sid, data):
                             "is_premium": False
                         } 
                         for p in participants if p.role == "pro"
+                
                     ],
                     "con_users": [
                         {
@@ -58,12 +63,13 @@ async def handle_join(sid, data):
                             "is_premium": False
                         } 
                         for p in participants if p.role == "con"
+                        
                     ],
                     "max_turns": room.max_turns or 10,
                     "current_turn": 1,
                     "messages": []
                 }
-                
+                print(initial_state)
                 debate_app.update_state(config, initial_state)
                 print(f"✅ Room {room_id} 초기화 완료")
             else:
@@ -85,6 +91,7 @@ async def handle_message(sid, data):
             stream_mode="values"
         ):
             await sio.emit("debate_update", event, room=f"debate_{room_id}")
+            print(event)
     except Exception as e:
         print(f"❌ 메시지 처리 중 에러 발생:")
         traceback.print_exc()
