@@ -24,7 +24,7 @@ from langgraph.checkpoint.memory import MemorySaver # LangGraph용 Memory -> 자
 from langgraph.checkpoint.postgres import PostgresSaver # PostgreSQL용 Memory -> 자동 기억장치 (서버)
 
 # State, Pydantic
-from schemas import (
+from .schemas import (
     DebateState
 )
 

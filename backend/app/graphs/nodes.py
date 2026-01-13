@@ -23,10 +23,9 @@ from .schemas import (
     TopicBriefing, RefereeDecision,
     ModeratorReport, PersonalCoachingReport
 )
-from config import (GEMINI_MODELS,
+from .config import (GEMINI_MODELS,
                     TEMPERATURE, MAX_TOKENS,
                     TAVILY_SEARCH,
-                    llm_c_configured,
                     llm_g_real_non_harm,
                     get_search_tool,
                     create_run_config)

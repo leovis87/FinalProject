@@ -5,8 +5,6 @@ import { useAuth } from "../contexts/AuthContext";
 import SearchPanel from "../components/panels/SearchPanel";
 import VerdictsPanel from "../components/panels/VerdictsPanel";
 import "../styles/HomePage.css";
-// 이미지 임포트 (경로가 정확한지 확인해주세요)
-import backgroundImage from '../assets/back.png';
 
 function HomePage() {
     const { user } = useAuth();
@@ -21,18 +19,7 @@ function HomePage() {
     };
 
     return (
-        <div 
-            className="home-container" 
-            // 여기에서 임포트한 backgroundImage 변수를 사용합니다.
-            style={{ 
-                backgroundImage: `url(${backgroundImage})`, 
-                backgroundSize: 'cover', 
-                backgroundPosition: 'center',
-                // 필요하다면 컨테이너가 화면을 꽉 채우도록 설정 (보통 CSS에서 처리하지만 확실하게 하기 위해)
-                minHeight: '100vh',
-                width: '100%'
-            }}
-        >
+        <div className="home-container">
             {/* 왼쪽 사이드바 */}
             <div className="sidebar-left">
                 <nav className="floating-nav">

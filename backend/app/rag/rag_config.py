@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 로컬 ??-?? 아티팩트 경로(인덱스/메타데이터) 기본값
-ARTIFACT_DIR = os.getenv("ARTIFACT_DIR", "app/rag/artifacts")
+ARTIFACT_DIR = os.getenv("ARTIFACT_DIR", "rag/artifacts")
 DATA_CSV_PATH = os.getenv("DATA_CSV_PATH", "data/topics.csv")
 
 # ?? ??? 인덱스와 메타데이터 저장 경로

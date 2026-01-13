@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { io } from "socket.io-client"; // ✅ socket.io-client 임포트
-import { RiSendPlaneFill, RiRobot2Line, RiTimerLine } from "react-icons/ri";
+import { io } from "socket.io-client";
+import { RiSendPlaneFill, RiRobot2Line, RiTimerLine, RiPlayFill } from "react-icons/ri";
 import "../styles/DebatePage.css";
 
 function DebatePage() {
@@ -11,13 +11,13 @@ function DebatePage() {
     const [room, setRoom] = useState(null);
     const [error, setError] = useState("");
 
-    // 채팅 관련 상태
     const [messageInput, setMessageInput] = useState("");
     const [messages, setMessages] = useState([]);
-    const socketRef = useRef(null); // ✅ Socket 객체를 유지하기 위한 Ref
+    const [debateStarted, setDebateStarted] = useState(false); // 토론 시작 여부 상태
+    const socketRef = useRef(null);
     const chatEndRef = useRef(null);
 
-    // 1. 방 정보 가져오기 (REST API)
+    // 1. 방 정보 가져오기
     useEffect(() => {
         const fetchRoom = async () => {
             try {
@@ -29,6 +29,10 @@ function DebatePage() {
                 if (response.ok) {
                     const data = await response.json();
                     setRoom(data);
+                    // 방 상태가 이미 진행 중이라면 시작 버튼을 숨김
+                    if (data.status !== "waiting") {
+                        setDebateStarted(true);
+                    }
                 } else {
                     setError("방 정보를 불러오지 못했습니다.");
                 }
@@ -40,70 +44,78 @@ function DebatePage() {
         fetchRoom();
     }, [roomId]);
 
-    // 2. 🔹 Socket.io 연결 및 이벤트 리스너 설정
+    // 2. Socket.io 연결
     useEffect(() => {
-        if (!roomId) return;
+        if (!roomId || !currentUser) return;
 
-        // Socket.io 연결 시도 (백엔드 포트 8000)
         const socket = io("http://localhost:8000", {
             path: "/socket.io",
-            transports: ["websocket"], // 성능을 위해 웹소켓 전송 강제
+            transports: ["websocket"],
         });
         socketRef.current = socket;
 
         socket.on("connect", () => {
             console.log("✅ Socket.io 연결 성공:", socket.id);
-            // 방 입장 이벤트 전송 (백엔드에서 sio.enter_room 처리를 위함)
-            socket.emit("join_debate", { room_id: roomId });
+            // 소켓 접속 시 join_debate 전송
+            socket.emit("join_debate", { 
+                room_id: roomId,
+                user_id: currentUser.user_id 
+            });
             setMessages([{ id: 'sys-start', type: 'system', content: "토론 서버에 연결되었습니다." }]);
         });
 
-        // 서버로부터 실시간 상태 업데이트 수신 (LangGraph의 State 데이터)
+        // 서버에서 토론이 시작됨을 알림 (방장의 start_debate 성공 시)
+        socket.on("debate_started", (data) => {
+            console.log("🚀 토론이 시작되었습니다!");
+            setDebateStarted(true);
+        });
+
         socket.on("debate_update", (data) => {
-            console.log("📩 서버 메시지 수신:", data);
-            if (data.messages) {
-                // LangGraph의 메시지 배열을 UI 형식에 맞춰 변환
+            console.log("📩 서버 업데이트:", data);
+            if (data.messages && Array.isArray(data.messages)) {
                 const formatted = data.messages.map((m, idx) => ({
-                    id: `msg-${idx}`,
-                    role: m.role || 'moderator',
+                    id: m.id || `msg-${idx}`,
+                    role: m.role,
                     nickname: m.user_name || (m.role === 'ai' ? 'AI 사회자' : '시스템'),
                     content: m.content,
-                    type: m.role === 'ai' ? 'moderator' : (m.role === 'system' ? 'system' : 'user')
+                    displayType: m.role === 'ai' ? 'moderator' : (m.role === 'system' ? 'system' : 'user')
                 }));
                 setMessages(formatted);
             }
         });
 
-        socket.on("connect_error", (err) => {
-            console.error("❌ 연결 에러:", err);
-            setError("실시간 통신 연결에 실패했습니다.");
+        socket.on("error", (err) => {
+            alert(err.message); // "Only the creator can start." 등의 에러 메시지 표시
         });
 
-        socket.on("disconnect", (reason) => {
-            console.log("❌ 연결 종료:", reason);
-        });
-
-        // 클린업: 컴포넌트 언마운트 시 연결 해제
         return () => {
             if (socket) socket.disconnect();
         };
-    }, [roomId]);
+    }, [roomId, currentUser]);
 
-    // 스크롤 자동 이동
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    // 3. 🔹 메시지 전송 로직
+    // [추가] 토론 시작 버튼 클릭 핸들러
+    const handleStartDebate = () => {
+        if (!socketRef.current || !currentUser) return;
+
+        // 서버의 handle_start(sid, data)는 room_id와 user_id를 기대함
+        socketRef.current.emit("start_debate", {
+            room_id: roomId,
+            user_id: currentUser.user_id
+        });
+    };
+
     const handleSendMessage = (e) => {
         e.preventDefault();
         if (!messageInput.trim() || !socketRef.current) return;
 
-        // 서버에 'send_message' 이벤트로 데이터 전송
         socketRef.current.emit("send_message", {
             room_id: roomId,
-            user_id: currentUser?.user_id,
-            user_name: currentUser?.nickname || "익명",
+            user_id: currentUser.user_id,
+            user_name: currentUser.nickname,
             content: messageInput
         });
 
@@ -120,11 +132,14 @@ function DebatePage() {
 
     const proTeam = room.participants.filter(p => p.role === "pro");
     const conTeam = room.participants.filter(p => p.role === "con");
+    
+    // 현재 접속자가 방장인지 확인
+    const isCreator = currentUser && parseInt(room.creator_id) === parseInt(currentUser.user_id);
 
     return (
         <div className="debate-container">
-            {/* 왼쪽 사이드바 (참가자 목록) */}
             <aside className="participants-sidebar">
+                {/* ... (팀 목록 UI는 이전과 동일) ... */}
                 <div className="team-section pro">
                     <div className="team-header-card pro">
                         <h2>찬성 TEAM</h2>
@@ -166,38 +181,44 @@ function DebatePage() {
                 </div>
             </aside>
 
-            {/* 중앙 메인 영역 */}
             <main className="center-main-area">
                 <header className="debate-room-header">
-                    <h1 className="room-title">{room.title}</h1>
+                    <div className="header-top">
+                        <h1 className="room-title">{room.title}</h1>
+                        {/* 🚀 방장이고 토론이 시작되지 않았을 때만 '토론 시작' 버튼 노출 */}
+                        {isCreator && !debateStarted && (
+                            <button className="start-debate-btn" onClick={handleStartDebate}>
+                                <RiPlayFill /> 토론 시작하기
+                            </button>
+                        )}
+                    </div>
                     <div className="topic-box">
                         <span className={`category-badge ${room.category}`}>{getCategoryName(room.category)}</span>
                         <span className="topic-text">{room.topic}</span>
                     </div>
                 </header>
 
-                {/* AI 사회자 상태 바 */}
                 <div className="moderator-status-bar">
                     <div className="mod-icon"><RiRobot2Line /></div>
                     <div className="mod-content">
                         <span className="mod-label">AI 사회자</span>
-                        <p className="mod-text">실시간으로 토론을 분석하고 있습니다.</p>
+                        <p className="mod-text">
+                            {debateStarted ? "토론이 진행 중입니다." : "토론 시작을 기다리고 있습니다."}
+                        </p>
                     </div>
                     <div className="timer-badge"><RiTimerLine /> 실시간</div>
                 </div>
 
-                {/* 채팅 내역 영역 */}
                 <div className="chat-window">
                     {messages.map((msg) => {
                         const isMe = msg.nickname === currentUser?.nickname;
-                        if (msg.type === 'system') return <div key={msg.id} className="system-message"><span>{msg.content}</span></div>;
-                        if (msg.type === 'moderator') return (
+                        if (msg.displayType === 'system') return <div key={msg.id} className="system-message"><span>{msg.content}</span></div>;
+                        if (msg.displayType === 'moderator') return (
                             <div key={msg.id} className="message-row moderator">
                                 <div className="msg-avatar mod"><RiRobot2Line /></div>
                                 <div className="msg-bubble mod">{msg.content}</div>
                             </div>
                         );
-
                         return (
                             <div key={msg.id} className={`message-row ${msg.role} ${isMe ? 'me' : ''}`}>
                                 {!isMe && (
@@ -215,15 +236,15 @@ function DebatePage() {
                     <div ref={chatEndRef} />
                 </div>
 
-                {/* 입력창 */}
                 <form className="input-area" onSubmit={handleSendMessage}>
                     <input
                         type="text"
-                        placeholder="메시지를 입력하세요..."
+                        placeholder={debateStarted ? "메시지를 입력하세요..." : "토론이 시작된 후 입력 가능합니다."}
                         value={messageInput}
                         onChange={(e) => setMessageInput(e.target.value)}
+                        disabled={!debateStarted} // 시작 전에는 입력 불가
                     />
-                    <button type="submit" className="send-btn" disabled={!messageInput.trim()}>
+                    <button type="submit" className="send-btn" disabled={!messageInput.trim() || !debateStarted}>
                         <RiSendPlaneFill />
                     </button>
                 </form>

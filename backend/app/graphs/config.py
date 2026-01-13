@@ -30,8 +30,8 @@ load_dotenv()
 # ============================================
 # 지원 모델 맵
 GEMINI_MODELS = {
-    "flash": "gemini-1.5-flash",
-    "pro": "gemini-1.5-pro"
+    "flash": "gemini-3-flash-preview",
+    "pro": "gemini-3-pro-preview"
 }
 
 
