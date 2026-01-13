@@ -1,10 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
 from sqlalchemy.orm import selectinload, joinedload
+from datetime import datetime
 
 from models.debate_room import DebateRoom
 from models.debate_participant import DebateParticipant
-from models.enums import DebateStatus
+from models.user import User
+from models.enums import DebateStatus, BadgeType
 from schemas.debate import DebateRoomCreate
 
 class DebateService:
@@ -108,5 +110,23 @@ class DebateService:
         await db.refresh(new_participant)
 
         return new_participant
+    
+    async def _add_badge(self, db: AsyncSession, user: User, badge_type: BadgeType):
+        """유저에게 뱃지 추가 (중복 체크)"""
+        badge_name = badge_type.value
+        current_badges = list(user.badges) if user.badges else []
+        
+        # 이미 보유 중인지 확인
+        if any(b.get('name') == badge_name for b in current_badges):
+            return
+
+        # 뱃지 추가
+        new_badge = {
+            "name": badge_name,
+            "acquired_at": datetime.now().isoformat()
+        }
+        current_badges.append(new_badge)
+        user.badges = current_badges
+        db.add(user)
 
 debate_service = DebateService()

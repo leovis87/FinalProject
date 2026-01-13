@@ -15,8 +15,6 @@ description:
 '''
 import os
 import logging
-import time
-import operator
 from dotenv import load_dotenv
 from datetime import datetime
 from typing import (Literal)
@@ -25,11 +23,11 @@ from .schemas import (
     TopicBriefing, RefereeDecision,
     ModeratorReport, PersonalCoachingReport
 )
-from .config import (GEMINI_MODELS,
+from config import (GEMINI_MODELS,
                     TEMPERATURE, MAX_TOKENS,
                     TAVILY_SEARCH,
                     llm_c_configured,
-                    llm_g_real_non_harm, llm_g_real_normal_harm,
+                    llm_g_real_non_harm,
                     get_search_tool,
                     create_run_config)
 from core.config import settings 
@@ -42,10 +40,8 @@ from langchain_core.runnables import (ConfigurableField, # ✅ LLM에 유연성 
 
 # LangChain Agent & Tools
 from langchain_google_genai import ChatGoogleGenerativeAI, HarmBlockThreshold, HarmCategory
-from langchain.agents import create_agent
-from langchain_core.callbacks import StreamingStdOutCallbackHandler
 
-# LangGraph 
+# LangGraph
 from langgraph.prebuilt import create_react_agent
 
 load_dotenv()
@@ -375,6 +371,7 @@ def _run_debater_logic(
         state_key_overwrite: final_content
     }
 
+
 def _parse_agent_output(agent_result_content) -> str:
     """
     Gemini/LangChain의 Agent 결과(content)가 String이 아니라 
@@ -432,6 +429,7 @@ def analyze_topic_node(state: DebateState,
     # 모델 설정 강제
     if 'configurable' not in run_config:
         run_config['configurable'] = {}
+
     run_config['configurable']['model'] = GEMINI_MODELS['flash']
     run_config['configurable']['temp'] = 0.7
     run_config['configurable']['token'] = MAX_TOKENS['high']

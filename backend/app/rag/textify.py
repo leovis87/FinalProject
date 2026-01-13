@@ -1,3 +1,8 @@
+"""검색 질의 정규화 및 임베딩용 텍스트 구성 유틸.
+
+??-?? 파이프라인에서 검색 품질을 높이기 위해
+질의의 불필요한 장르 단어를 정리하고, 임베딩 입력을 구성합니다.
+"""
 import re
 
 GENRE_WORDS = [
@@ -9,6 +14,7 @@ GENRE_WORDS = [
 ]
 
 def normalize_query(q: str) -> str:
+    """질의에서 장르/수사적 단어를 제거해 검색 품질을 높입니다."""
     q2 = q
     for w in GENRE_WORDS:
         q2 = q2.replace(w, "주제")
@@ -17,7 +23,8 @@ def normalize_query(q: str) -> str:
     return q2
 
 def make_text_for_embedding(m: dict) -> str:
-    # 임베딩 텍스트에는 '토론' 같은 장르 단어를 굳이 넣지 않는 편이 안정적
+    # ??? ??? ?? ??? ??? ?? ???? ??? ?? ?????.
+    # TODO: ??/??? ???? ??? ??? ??? ?? ? ????.
     kw = m.get("keywords", [])
     return (
         f"{m['level']} {m['subject']} "

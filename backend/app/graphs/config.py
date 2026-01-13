@@ -12,20 +12,15 @@ from langchain.agents import create_agent
 # LangChain Core
 from langchain_google_genai import ChatGoogleGenerativeAI # Gemini 전용
 from langchain_google_genai import HarmBlockThreshold, HarmCategory # 안전 설정용 가드레일
-from langchain_openai import ChatOpenAI # OpenAI (Gemini용)
-from langchain_core.prompts import (ChatPromptTemplate, # Chain LLM용 prompt
-                                    SystemMessagePromptTemplate, # Caching
-                                    MessagesPlaceholder) # Chain용 prompt, memory
-from langchain_core.messages import HumanMessage, AIMessage # 수동 기억장치 (history)
-from langchain_core.messages import SystemMessage # ✅ Prompt Caching 활성화
-from langchain_core.runnables import (ConfigurableField, # ✅ LLM에 유연성 부여
-                                      RunnableConfig)    # IDE 자동 완성 / 설정 관리
+from langchain_core.runnables import (
+    ConfigurableField, # ✅ LLM에 유연성 부여
+    RunnableConfig     # IDE 자동 완성 / 설정 관리
+)    
 from langchain_core.callbacks import StreamingStdOutCallbackHandler
-
-# ✅ 최신 langchain-tavily 클래스명으로 수정
-from langchain_tavily import TavilySearch 
-# ✅ 중앙 설정 객체 임포트 (경로 에러 방지를 위해 core.config 사용)
 from core.config import settings 
+
+# LangChain Tools
+from langchain_community.tools.tavily_search import TavilySearchResults # Tavily를 이용한 검색 툴
 
 load_dotenv()
 
@@ -33,9 +28,7 @@ load_dotenv()
 # ============================================
 # 🤖 Model mapping
 # ============================================
-# ✅ nodes.py 에러 방지를 위해 빈 객체로 유지
-CLAUDE_MODELS = {}
-
+# 지원 모델 맵
 GEMINI_MODELS = {
     "flash": "gemini-1.5-flash",
     "pro": "gemini-1.5-pro"
@@ -60,9 +53,10 @@ MAX_TOKENS = {
 
 # ============================================
 # 🔎 Set langchain tools
+#   - Tool 생성
 # ============================================
-# ✅ DuckDuckGo 제거 및 TavilySearch로 클래스명 수정
-TAVILY_SEARCH = TavilySearch(
+# Tavily searching tool 생성
+TAVILY_SEARCH = TavilySearchResults(
     max_results = 3,
     topic = 'general',
     include_answer = True,      # AI 요약 포함
@@ -71,14 +65,9 @@ TAVILY_SEARCH = TavilySearch(
 
 
 # ============================================
-# 2-1. 🤖 Claude (삭제됨)
-# ============================================
-# ✅ nodes.py 에러 방지를 위해 None으로 유지
-llm_c_configured = None
-
-
-# ============================================
-# 2-2. 🤖 동적 설정이 가능한 메인 LLM (Gemini)
+# 2. 🤖 동적 설정이 가능한 메인 LLM (Gemini)
+#   - invoke 시 config={'configurable': {'temp': 0.9}} 등으로 제어 가능
+#   - ⚠️ 직관적이진 않음. 사용 시 주의
 # ============================================
 llm_g_real_non_harm = ChatGoogleGenerativeAI(
     model = GEMINI_MODELS['flash'],
@@ -143,8 +132,10 @@ def get_search_tool(use_tavily: bool = True):
         - 검색 tool 선택 함수
         - DuckDuckGo가 제거되어 항상 Tavily를 사용합니다.
     """
-    logging.info('🔎 Tavily search tool 사용 (DuckDuckGo 제거됨)')
-    return TAVILY_SEARCH
+    if use_tavily:
+        logging.info('🔎 Tavily search tool 사용')
+        return TAVILY_SEARCH
+
 
 # Config & Callback 재조립 함수
 def create_run_config(base_config: RunnableConfig,

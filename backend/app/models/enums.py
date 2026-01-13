@@ -36,3 +36,11 @@ class DebateRole(str, enum.Enum):
     PRO = "pro"             # 찬성
     CON = "con"             # 반대
     OBSERVER = "observer"   # 관전자
+
+# 배지 종류
+class BadgeType(str, enum.Enum):
+    NOVICE = "새싹 토론가"
+    BLOOMING = "피어나는 토론가"
+    PASSIONATE = "열혈 토론가"
+    POPULAR = "인기 토론가"
+    KING = "토론왕"

@@ -19,15 +19,13 @@ from psycopg_pool import ConnectionPool
 from dotenv import load_dotenv
 
 # LangGraph
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
+from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver # LangGraph용 Memory -> 자동 기억장치 (RAM)
 from langgraph.checkpoint.postgres import PostgresSaver # PostgreSQL용 Memory -> 자동 기억장치 (서버)
 
 # State, Pydantic
-from .schemas import (
-    DebateState,
-    TopicBriefing, PersonalCoachingReport
+from schemas import (
+    DebateState
 )
 
 # Node, Func
@@ -37,7 +35,7 @@ from .nodes import (
     con_turn_node_user, con_turn_node_ai, # 반대측
     referee_node_ai, # 중재자 (비방, 욕설, 논점이탈)
     summary_node, # 찬 -> 반 -> 중재 -> 요약
-    _generate_team_feedback, moderator_shared_node, # 사회자
+    moderator_shared_node, # 사회자
     pro_feedback_node, con_feedback_node, # 개개인 feedback
     # 분기 처리
     should_continue_debate, # 찬->반 loop 분기
@@ -60,7 +58,6 @@ logging.basicConfig(
     filename = 'debate_mvp.log',
     encoding = 'utf-8'
 )
-
 
 # ============================================
 # DB 설정
@@ -188,7 +185,17 @@ workflow.add_edge('con_feedback', END)
 # Graph 컴파일 시 checkpointer 추가
 # 💡 추후 DB (PostgreSQL checkpointer로 연결 => 휘발 메모리 + DB 완성)
 memory = MemorySaver()  # Ram 저장 == 휘발 but 빠름!!
-debate_app = workflow.compile(checkpointer = memory)
+debate_app = workflow.compile(checkpointer = memory,
+                              
+                              # ⭐ [Option] 노드의 key 값 (예: 'pro_turn')을 넣으면,
+                              #    해당 노드에서 멈춤!
+                              #    추가로 멈추게 하려면 추가도 가능함.
+                              #    🤖 vs 🤖는 interrupt_before를 없애면 됨!
+                              interrupt_before = [
+                                  'pro_turn',
+                                  'con_turn'
+                                ]
+                            )
 
 # ✅ PostgreSQL Saver 사용하여 실행 시
 # debate_app_with_postgres = create_app_with_db()

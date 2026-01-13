@@ -1,6 +1,6 @@
 from sqlalchemy import (
     UniqueConstraint, Column, Integer, Enum as SAEnum,
-    String, Date, Boolean, DateTime, func
+    String, Date, Boolean, DateTime, func, JSON
 )
 from sqlalchemy.orm import relationship
 
@@ -22,6 +22,15 @@ class User(Base):
     phone_number = Column(String(20), index=True, nullable=True)
     birth_date = Column(Date, nullable=True)
     gender = Column(String(10), nullable=True)
+
+    level = Column(Integer, default=1, nullable=False)
+    exp = Column(Integer, default=0, nullable=False)
+    points = Column(Integer, default=0, nullable=False)
+
+    badges = Column(JSON, default=list, nullable=False)
+    likes_received = Column(Integer, default=0, nullable=False)
+
+    is_premium = Column(Boolean, default=False, nullable=False)
 
     provider = Column(
         SAEnum(AuthProvider, name="auth_provider_enum", native_enum=False),
