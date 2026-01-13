@@ -23,6 +23,10 @@ function CreateRoomModal({ onClose }) {
     const [error, setError] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // AI 추천 관련 상태
+    const [isRecommending, setIsRecommending] = useState(false);
+    const [recommendedTopics, setRecommendedTopics] = useState([]);
+
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFormData(prev => ({
@@ -38,6 +42,62 @@ function CreateRoomModal({ onClose }) {
 
     const handleRoleChange = (role) => {
         setFormData(prev => ({ ...prev, creator_role: role }));
+    };
+
+    // 주제 추천 요청 함수
+    const handleAiRecommend = async () => {
+        if (!formData.topic.trim()) {
+            alert("원하는 주제의 키워드를 '토론 주제' 칸에 먼저 입력해주세요.\n(예: 환경, AI, 동물원)");
+            return;
+        }
+
+        setIsRecommending(true);
+        setError("");
+        setRecommendedTopics([]);
+
+        try {
+            const token = localStorage.getItem("access_token");
+            const response = await fetch("http://localhost:8000/rag/topics/generate", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    user_query: formData.topic,   // 사용자가 입력한 키워드
+                    level: formData.level,        // 선택된 학년/난이도
+                    subject: formData.category,   // 선택된 카테고리
+                    n_topics: 3                   // 추천받을 주제 개수
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.topics && data.topics.length > 0) {
+                    setRecommendedTopics(data.topics);
+                } else {
+                    alert("적절한 토론 주제를 찾지 못했습니다. 다른 키워드로 시도해보세요.");
+                }
+            } else {
+                console.error("AI Recommendation failed");
+                alert("주제 추천 중 오류가 발생했습니다.");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("서버 통신 오류가 발생했습니다.");
+        } finally {
+            setIsRecommending(false);
+        }
+    };
+
+    // 추천된 주제 선택 시 폼에 적용
+    const selectRecommendedTopic = (recTopic) => {
+        setFormData(prev => ({
+            ...prev,
+            topic: recTopic.topic_text,
+            topic_description: recTopic.one_line_context
+        }));
+        setRecommendedTopics([]);
     };
 
     const validateForm = () => {
@@ -144,16 +204,69 @@ function CreateRoomModal({ onClose }) {
                                     </select>
                                 </div>
 
-                                {/* 토론 주제 */}
+                                {/* 토론 주제 + AI 추천 버튼 */}
                                 <div className="create-form-group">
-                                    <label>토론 주제</label>
+                                    <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        토론 주제
+                                        <button 
+                                            type="button" 
+                                            className="ai-recommend-btn"
+                                            onClick={handleAiRecommend}
+                                            disabled={isRecommending}
+                                            style={{ 
+                                                fontSize: '0.8rem', 
+                                                padding: '2px 8px', 
+                                                cursor: 'pointer',
+                                                backgroundColor: isRecommending ? '#ccc' : '#6c5ce7',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '4px'
+                                            }}
+                                        >
+                                            {isRecommending ? "생성 중..." : "✨ AI에게 주제를 추천 받아보세요"}
+                                        </button>
+                                    </label>
                                     <input
                                         type="text"
                                         name="topic"
                                         value={formData.topic}
                                         onChange={handleChange}
-                                        placeholder="토론할 주제(논제)"
+                                        placeholder="키워드를 입력하고 추천 버튼을 눌러보세요"
                                     />
+                                    
+                                    {/* 추천 목록 표시 영역 */}
+                                    {recommendedTopics.length > 0 && (
+                                        <div className="recommendation-list" style={{ 
+                                            marginTop: '8px', 
+                                            border: '1px solid #ddd', 
+                                            borderRadius: '4px',
+                                            padding: '8px',
+                                            backgroundColor: '#f8f9fa'
+                                        }}>
+                                            <p style={{ fontSize: '0.8rem', color: '#666', marginBottom: '4px' }}>
+                                                💡 추천된 주제 (클릭하여 적용)
+                                            </p>
+                                            {recommendedTopics.map((item, idx) => (
+                                                <div 
+                                                    key={idx} 
+                                                    onClick={() => selectRecommendedTopic(item)}
+                                                    style={{
+                                                        padding: '6px',
+                                                        borderBottom: idx < recommendedTopics.length - 1 ? '1px solid #eee' : 'none',
+                                                        cursor: 'pointer',
+                                                        fontSize: '0.9rem'
+                                                    }}
+                                                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#eef2ff'}
+                                                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                                >
+                                                    <strong>{item.topic_text}</strong>
+                                                    <div style={{ fontSize: '0.8rem', color: '#555', marginTop: '2px' }}>
+                                                        {item.one_line_context}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* 주제 설명 */}
@@ -163,7 +276,7 @@ function CreateRoomModal({ onClose }) {
                                         name="topic_description"
                                         value={formData.topic_description}
                                         onChange={handleChange}
-                                        placeholder="부가 설명을 적어주세요"
+                                        placeholder="주제 선택 시 자동 완성되거나 직접 입력하세요"
                                         rows={3}
                                     />
                                 </div>
