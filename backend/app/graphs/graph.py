@@ -282,4 +282,8 @@ if __name__ == '__main__':
             'callbacks': []
         }
     )
-    print(dir)
+    print(dir(result))
+    print(result.values())
+    for k, v in result.items():
+        print("Key: ", k)
+        print("Value: ", v)
