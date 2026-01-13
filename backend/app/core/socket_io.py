@@ -1,10 +1,4 @@
-# Summary:
-# - Added deterministic round orchestration with round-robin and representative turns.
-# - Enforced turn gating with clear rejection messaging per round rules.
-# - Inserted LLM moderator messages for topic start, round summaries, and final report.
-# - Maintained per-room state (round/turn order, spoken sets, last-spoken policy).
-# - Added per-room locks to keep concurrent messages from breaking turn order.
-# - Kept graph.py interface unchanged and used debate_app for LLM outputs.
+# app/core/socket_io.py
 import asyncio
 import os
 import sys
@@ -666,6 +660,10 @@ async def handle_message(sid, data):
         room_state["last_spoken"][str(user_id)] = room_state["global_spoken_seq"]
         room_state["per_round_spoken_set"][room_state["current_round"]].add(str(user_id))
 
+        # [수정] 차례를 먼저 증가시킨 후 클라이언트에 알립니다.
+        # 이렇게 해야 'next_speaker'가 올바르게 업데이트된 채로 전송됩니다.
+        room_state["turn_index"] += 1
+
         await sio.emit(
             "debate_update",
             _message_payload(message, room_state, replace=False),
@@ -675,7 +673,7 @@ async def handle_message(sid, data):
         _debug_print(accept_payload)
         await _emit_debug(accept_payload, room_id_str, sid=sid)
 
-        room_state["turn_index"] += 1
+        # 라운드 종료 여부 확인
         if room_state["turn_index"] < len(room_state["turn_order"]):
             return
 

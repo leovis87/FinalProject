@@ -55,7 +55,7 @@ logging.basicConfig(
     format = '%(asctime)s %(levelname)s:%(message)s',
     level = logging.INFO,
     datefmt = '%m/%d/%Y %I:%M:%S %p',
-    filename = 'debate_mvp.log',
+    filename = 'debate_mvp2.log',
     encoding = 'utf-8'
 )
 

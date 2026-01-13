@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload
 from datetime import datetime
 
 from models.debate_room import DebateRoom
@@ -13,7 +13,6 @@ class DebateService:
     async def create_debate_room(self, db: AsyncSession, debate_create: DebateRoomCreate, creator_id: int) -> DebateRoom:
         """토론방 생성 및 개설자 참가 처리"""
         debate_data = debate_create.model_dump()
-
         creator_role = debate_data.pop('creator_role')
         
         new_debate = DebateRoom(
@@ -108,17 +107,10 @@ class DebateService:
         db.add(new_participant)
         await db.flush()
 
-        # 인원수가 꽉 찼는지 확인하여 방 상태 변경
-        # 관전자를 제외한 실제 토론자 수 계산
-        query_total = select(func.count()).where(
-            DebateParticipant.debate_room_id == debate_id,
-            DebateParticipant.role.in_(["pro", "con"])
-        )
-        total_debaters = (await db.execute(query_total)).scalar()
-
-        if total_debaters >= room.max_users:
-            room.status = DebateStatus.PROCEEDING
-            room.started_at = datetime.now()
+        # -------------------------------------------------------
+        # 수정사항: 인원이 차도 자동으로 상태를 바꾸지 않음.
+        # 방장이 소켓(socket_io.py)을 통해 직접 시작할 때까지 WAITING 유지.
+        # -------------------------------------------------------
         
         await db.commit()
         await db.refresh(new_participant)
