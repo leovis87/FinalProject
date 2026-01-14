@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload
 from datetime import datetime
 
 from models.debate_room import DebateRoom
@@ -13,7 +13,6 @@ class DebateService:
     async def create_debate_room(self, db: AsyncSession, debate_create: DebateRoomCreate, creator_id: int) -> DebateRoom:
         """토론방 생성 및 개설자 참가 처리"""
         debate_data = debate_create.model_dump()
-
         creator_role = debate_data.pop('creator_role')
         
         new_debate = DebateRoom(
@@ -86,8 +85,8 @@ class DebateService:
             result_count = await db.execute(query_count)
             current_role_count = result_count.scalar()
 
-            # 팀당 최대 인원
-            max_team_size = room.max_users // 2 # 2:2
+            # 팀당 최대 인원 (예: 2:2 토론이면 max_users가 4)
+            max_team_size = room.max_users // 2
 
             if current_role_count >= max_team_size:
                 raise ValueError(f"{role} 진영이 꽉 찼습니다.")
@@ -106,6 +105,13 @@ class DebateService:
         )
 
         db.add(new_participant)
+        await db.flush()
+
+        # -------------------------------------------------------
+        # 수정사항: 인원이 차도 자동으로 상태를 바꾸지 않음.
+        # 방장이 소켓(socket_io.py)을 통해 직접 시작할 때까지 WAITING 유지.
+        # -------------------------------------------------------
+        
         await db.commit()
         await db.refresh(new_participant)
 
@@ -116,11 +122,9 @@ class DebateService:
         badge_name = badge_type.value
         current_badges = list(user.badges) if user.badges else []
         
-        # 이미 보유 중인지 확인
         if any(b.get('name') == badge_name for b in current_badges):
             return
 
-        # 뱃지 추가
         new_badge = {
             "name": badge_name,
             "acquired_at": datetime.now().isoformat()
