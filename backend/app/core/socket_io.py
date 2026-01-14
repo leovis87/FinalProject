@@ -376,13 +376,35 @@ def _run_round_summary(room_state: dict, round_number: int) -> str:
     return f"[Round {round_number}] Summary unavailable."
 
 
-def _run_final_report(room_state: dict) -> str:
+# 1. 기존의 _format_moderator_report는 삭제하고 이 함수를 추가하세요.
+def _get_final_report_data(room_state: dict) -> Optional[dict]:
+    """사회자 최종 리포트 객체를 생성하고 JSON safe한 dict로 반환합니다."""
     state = _graph_base_state(room_state)
     state["messages"] = list(room_state.get("dialogue_messages", []))
     config = _graph_config(f"debate_{room_state['room_id']}_final")
+    
+    # LangGraph 실행 (moderator_shared 노드로 이동)
     result = debate_app.invoke(Command(update=state, goto="moderator_shared"), config)
     report = result.get("moderator_report") if isinstance(result, dict) else None
-    return _format_moderator_report(report)
+    
+    # Pydantic 모델이나 객체를 JSON으로 보낼 수 있게 dict로 변환
+    return _to_json_safe(report)
+
+# 2. 시스템 메시지에 display_type을 넣을 수 있도록 수정하세요.
+async def _emit_system_message(room_state: dict, content: str, display_type: str = "moderator") -> None:
+    message = {
+        "turn": room_state.get("current_round", 0),
+        "role": "ai",
+        "user_name": "Moderator",
+        "content": content,
+        "display_type": display_type  # 프론트에서 '찢어서' 보게 해주는 핵심 키
+    }
+    room_state["messages"].append(message)
+    await sio.emit(
+        "debate_update",
+        _message_payload(message, room_state, replace=False),
+        room=f"debate_{room_state['room_id']}",
+    )
 
 
 @sio.event
@@ -591,58 +613,30 @@ async def handle_message(sid, data):
     lock = _get_lock(room_id_str)
 
     async with lock:
-        payload = _debug_payload("info", "MSG", room_id_str, str(user_id), "message received")
-        _debug_print(payload)
-        await _emit_debug(payload, room_id_str, sid=sid)
-
         room_state = _room_states.get(room_id_str)
         if not room_state:
             await sio.emit("debate_error", {"message": "Room state not ready."}, to=sid)
-            await _emit_error("Room state not ready.", room_id_str, sid=sid)
-            payload = _debug_payload("warn", "MSG", room_id_str, str(user_id), "room_state missing")
-            _debug_print(payload)
-            await _emit_debug(payload, room_id_str, sid=sid)
             return
 
         if room_state.get("current_round", 0) == 0:
             await sio.emit("debate_error", {"message": "Debate has not started."}, to=sid)
-            await _emit_error("Debate has not started.", room_id_str, sid=sid)
-            payload = _debug_payload("warn", "MSG", room_id_str, str(user_id), "debate not started")
-            _debug_print(payload)
-            await _emit_debug(payload, room_id_str, sid=sid)
             return
 
         participant = _participant_for(room_state, str(user_id))
         if not participant:
             await sio.emit("debate_error", {"message": "You are not a participant."}, to=sid)
-            await _emit_error("You are not a participant.", room_id_str, sid=sid)
-            payload = _debug_payload("warn", "MSG", room_id_str, str(user_id), "not a participant")
-            _debug_print(payload)
-            await _emit_debug(payload, room_id_str, sid=sid)
             return
 
+        # 발언권 체크
         expected = _next_speaker(room_state)
         if expected and expected["user_id"] != str(user_id):
-            await sio.emit(
-                "debate_error",
-                {
-                    "message": f"Not your turn. Next speaker: {expected['user_name']}.",
-                    "next_speaker": expected,
-                },
-                to=sid,
-            )
-            await _emit_error("Not your turn.", room_id_str, sid=sid)
-            payload = _debug_payload(
-                "warn",
-                "MSG",
-                room_id_str,
-                str(user_id),
-                f"rejected next={expected['user_id']}",
-            )
-            _debug_print(payload)
-            await _emit_debug(payload, room_id_str, sid=sid)
+            await sio.emit("debate_error", {
+                "message": f"Not your turn. Next speaker: {expected['user_name']}.",
+                "next_speaker": expected,
+            }, to=sid)
             return
 
+        # 메시지 데이터 생성
         role = participant["side"]
         message = {
             "turn": room_state["current_round"],
@@ -652,102 +646,82 @@ async def handle_message(sid, data):
             "content": content,
         }
 
+        # 상태 기록
         room_state["messages"].append(message)
         room_state["dialogue_messages"].append(message)
-        room_state["round_messages"][room_state["current_round"]].append(message)
-
+        room_state["round_messages"].setdefault(room_state["current_round"], []).append(message)
+        
+        # 차례 인덱스 증가 (먼저 증가시켜야 next_speaker가 올바르게 전송됨)
+        room_state["turn_index"] += 1
         room_state["global_spoken_seq"] += 1
         room_state["last_spoken"][str(user_id)] = room_state["global_spoken_seq"]
         room_state["per_round_spoken_set"][room_state["current_round"]].add(str(user_id))
 
-        # [수정] 차례를 먼저 증가시킨 후 클라이언트에 알립니다.
-        # 이렇게 해야 'next_speaker'가 올바르게 업데이트된 채로 전송됩니다.
-        room_state["turn_index"] += 1
-
+        # 발언 업데이트 전송
         await sio.emit(
             "debate_update",
             _message_payload(message, room_state, replace=False),
             room=f"debate_{room_id_str}",
         )
-        accept_payload = _debug_payload("info", "MSG", room_id_str, str(user_id), "message accepted")
-        _debug_print(accept_payload)
-        await _emit_debug(accept_payload, room_id_str, sid=sid)
 
-        # 라운드 종료 여부 확인
+        # 라운드 종료 여부 확인 (발언할 사람이 남았으면 함수 종료)
         if room_state["turn_index"] < len(room_state["turn_order"]):
             return
 
-        # Round completed.
+        # --- 라운드가 종료된 시점 (Round Completed) ---
         round_number = room_state["current_round"]
+        
+        # 1. 라운드 요약 생성
         try:
-            graph_payload = _debug_payload("info", "GRAPH", room_id_str, str(user_id), "round_summary start")
-            _debug_print(graph_payload)
-            await _emit_debug(graph_payload, room_id_str, sid=sid)
             summary_text = _run_round_summary(room_state, round_number)
             await _emit_system_message(room_state, summary_text)
-            graph_payload = _debug_payload("info", "GRAPH", room_id_str, str(user_id), "round_summary done")
-            _debug_print(graph_payload)
-            await _emit_debug(graph_payload, room_id_str, sid=sid)
         except Exception:
             traceback.print_exc()
-            await _emit_error("Round summary failed.", room_id_str, sid=sid)
 
+        # 2. 최종 판결 (4라운드 종료 시)
         if round_number >= 4:
             try:
-                graph_payload = _debug_payload("info", "GRAPH", room_id_str, str(user_id), "final_report start")
-                _debug_print(graph_payload)
-                await _emit_debug(graph_payload, room_id_str, sid=sid)
-                final_text = _run_final_report(room_state)
-                await _emit_system_message(room_state, final_text)
-                graph_payload = _debug_payload("info", "GRAPH", room_id_str, str(user_id), "final_report done")
-                _debug_print(graph_payload)
-                await _emit_debug(graph_payload, room_id_str, sid=sid)
+                # 위에서 정의한 헬퍼 함수 호출
+                report_data = _get_final_report_data(room_state)
+                
+                if report_data:
+                    # 데이터를 각각의 display_type으로 찢어서 4번 전송
+                    await _emit_system_message(room_state, report_data.get("general_summary", ""), "report_summary")
+                    await _emit_system_message(room_state, report_data.get("pro_eval", {}), "report_pro")
+                    await _emit_system_message(room_state, report_data.get("con_eval", {}), "report_con")
+                    if report_data.get("best_player"):
+                        await _emit_system_message(room_state, report_data["best_player"], "report_mvp")
+
             except Exception:
                 traceback.print_exc()
                 await _emit_error("Final report failed.", room_id_str, sid=sid)
+            
+            # 방 상태를 종료로 변경
             async with AsyncSessionLocal() as db:
-                room = await db.get(DebateRoom, int(room_id))
+                room = await db.get(DebateRoom, int(room_id_str))
                 if room:
-                    previous_status = room.status
                     room.status = DebateStatus.FINISHED
                     await db.commit()
-                    state_payload = _debug_payload(
-                        "info",
-                        "STATE",
-                        room_id_str,
-                        str(user_id),
-                        f"{previous_status} -> {room.status}",
-                    )
-                    _debug_print(state_payload, state=str(room.status))
-                    await _emit_debug(state_payload, room_id_str, sid=sid)
             return
 
-        # Move to next round.
+        # 3. 다음 라운드 이동 로직 (1~3 라운드 종료 시)
+        # ⭐ [해결] 여기서 next_round 변수를 명확히 정의함
         next_round = round_number + 1
+        
+        # 새로운 라운드 세팅 (_set_round 함수 활용)
         skipped = _set_round(room_state, next_round)
         if skipped:
             for side in skipped:
-                await _emit_system_message(
-                    room_state,
-                    f"Moderator: {side} has no available speaker this round. Skipping.",
-                )
+                await _emit_system_message(room_state, f"Moderator: {side} has no available speaker. Skipping.")
 
+        # DB 라운드 상태 업데이트
         async with AsyncSessionLocal() as db:
-            room = await db.get(DebateRoom, int(room_id))
+            room = await db.get(DebateRoom, int(room_id_str))
             if room:
-                previous_status = room.status
                 room.status = _round_status(next_round)
                 await db.commit()
-                state_payload = _debug_payload(
-                    "info",
-                    "STATE",
-                    room_id_str,
-                    str(user_id),
-                    f"{previous_status} -> {room.status}",
-                )
-                _debug_print(state_payload, state=str(room.status))
-                await _emit_debug(state_payload, room_id_str, sid=sid)
 
+        # 클라이언트에 다음 라운드 정보 전송
         await sio.emit(
             "debate_update",
             {

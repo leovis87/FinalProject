@@ -55,7 +55,7 @@ logging.basicConfig(
     format = '%(asctime)s %(levelname)s:%(message)s',
     level = logging.INFO,
     datefmt = '%m/%d/%Y %I:%M:%S %p',
-    filename = 'debate_mvp2.log',
+    filename = 'debate_mvp.log',
     encoding = 'utf-8'
 )
 
@@ -289,8 +289,3 @@ if __name__ == '__main__':
             'callbacks': []
         }
     )
-    print(dir(result))
-    print(result.values())
-    for k, v in result.items():
-        print("Key: ", k)
-        print("Value: ", v)

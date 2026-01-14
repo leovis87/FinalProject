@@ -2,7 +2,19 @@ import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { io } from "socket.io-client";
-import { RiSendPlaneFill, RiRobot2Line, RiTimerLine, RiPlayFill, RiUserVoiceLine } from "react-icons/ri";
+import { 
+    RiSendPlaneFill, 
+    RiRobot2Line, 
+    RiTimerLine, 
+    RiPlayFill, 
+    RiUserVoiceLine,
+    RiTrophyLine,
+    RiMedalLine,
+    RiBarChartFill,
+    RiFileTextLine,
+    RiCheckLine,
+    RiInformationLine
+} from "react-icons/ri";
 import "../styles/DebatePage.css";
 
 function DebatePage() {
@@ -15,7 +27,7 @@ function DebatePage() {
     const [messages, setMessages] = useState([]);
     const [debateStarted, setDebateStarted] = useState(false);
     
-    // 실시간 상태 관리
+    // 실시간 상태 관리 (라운드, 턴 정보)
     const [roundInfo, setRoundInfo] = useState({
         currentRound: 0,
         turnIndex: 0,
@@ -38,6 +50,7 @@ function DebatePage() {
                 if (response.ok) {
                     const data = await response.json();
                     setRoom(data);
+                    // 방 상태가 진행 중이면 debateStarted를 true로 설정하여 입력창 활성화
                     if (data.status !== "waiting") {
                         setDebateStarted(true);
                     }
@@ -78,6 +91,11 @@ function DebatePage() {
         socket.on("debate_update", (data) => {
             console.log("📩 실시간 업데이트:", data);
             
+            // ⭐ [해결] 발언권 문제 해결: 업데이트 데이터가 오고 라운드가 1 이상이면 토론 진행 중으로 간주
+            if (data.current_round > 0) {
+                setDebateStarted(true);
+            }
+
             // 라운드 및 차례 정보 업데이트
             setRoundInfo({
                 currentRound: data.current_round,
@@ -86,14 +104,15 @@ function DebatePage() {
                 nextSpeaker: data.next_speaker
             });
 
-            // 메시지 목록 업데이트 (replace_messages가 true면 전체 교체)
+            // 메시지 목록 업데이트
             if (data.messages) {
                 const formatted = data.messages.map((m, idx) => ({
                     id: m.id || `${Date.now()}-${idx}`,
                     role: m.role,
                     nickname: m.user_name || (m.role === 'ai' ? 'AI 사회자' : '시스템'),
                     content: m.content,
-                    displayType: m.role === 'ai' ? 'moderator' : (m.role === 'system' ? 'system' : 'user')
+                    // ⭐ 백엔드에서 찢어서 보내주는 display_type을 그대로 받아서 사용
+                    displayType: m.display_type || (m.role === 'ai' ? 'moderator' : (m.role === 'system' ? 'system' : 'user'))
                 }));
 
                 if (data.replace_messages) {
@@ -111,6 +130,7 @@ function DebatePage() {
         return () => socket.disconnect();
     }, [roomId, currentUser]);
 
+    // 새 메시지 올 때마다 자동 스크롤
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
@@ -138,7 +158,7 @@ function DebatePage() {
         setMessageInput("");
     };
 
-    // 내 차례인지 확인하는 로직
+    // 내 차례인지 확인하는 로직 (input 비활성화 해제용)
     const isMyTurn = roundInfo.nextSpeaker && String(roundInfo.nextSpeaker.user_id) === String(currentUser?.user_id);
     const isCreator = currentUser && parseInt(room?.creator_id) === parseInt(currentUser.user_id);
 
@@ -214,7 +234,103 @@ function DebatePage() {
     );
 }
 
-// 컴포넌트 분리: 팀 목록
+// 컴포넌트 분리: 메시지 행 (여기서 찢어서 출력 처리)
+function MessageRow({ msg, isMe }) {
+    if (msg.displayType === 'system') return <div className="system-message"><span>{msg.content}</span></div>;
+    
+    // ⭐ [신규] 찢어서 출력하기 1: 전체 총평 요약 (display_type: report_summary)
+    if (msg.displayType === 'report_summary') return (
+        <div className="report-item summary">
+            <div className="report-tag"><RiFileTextLine /> 전체 총평</div>
+            <div className="report-content">{msg.content}</div>
+        </div>
+    );
+
+    // ⭐ [신규] 찢어서 출력하기 2: 팀 평가 (display_type: report_pro / report_con)
+    // content가 객체(JSON)로 오므로 키 값을 직접 참조함
+    if (msg.displayType === 'report_pro' || msg.displayType === 'report_con') {
+        const type = msg.displayType === 'report_pro' ? 'pro' : 'con';
+        return <TeamResultCard title={type === 'pro' ? '찬성 팀' : '반대 팀'} data={msg.content} type={type} />;
+    }
+
+    // ⭐ [신규] 찢어서 출력하기 3: MVP 선정 (display_type: report_mvp)
+    if (msg.displayType === 'report_mvp') return (
+        <div className="report-item mvp">
+            <div className="mvp-announcement">
+                <RiMedalLine className="mvp-icon" />
+                <span>이번 토론의 MVP는 <strong>{msg.content}</strong>님입니다! 축하드립니다! 🏆</span>
+            </div>
+        </div>
+    );
+
+    // 일반 사회자 메시지
+    if (msg.displayType === 'moderator') return (
+        <div className="message-row moderator">
+            <div className="msg-avatar mod"><RiRobot2Line /></div>
+            <div className="msg-bubble mod">{msg.content}</div>
+        </div>
+    );
+
+    // 일반 사용자 메시지
+    return (
+        <div className={`message-row ${msg.role} ${isMe ? 'me' : ''}`}>
+            {!isMe && (
+                <div className="msg-avatar">
+                    <img src={`https://api.dicebear.com/9.x/notionists/svg?seed=${msg.nickname}`} alt="p" />
+                </div>
+            )}
+            <div className="msg-content">
+                {!isMe && <span className="msg-name">{msg.nickname}</span>}
+                <div className={`msg-bubble ${msg.role}`}>{msg.content}</div>
+            </div>
+        </div>
+    );
+}
+
+// 팀별 평가 카드 (객체 키-값 접근 핵심)
+function TeamResultCard({ title, data, type }) {
+    return (
+        <div className={`team-result-card ${type}`}>
+            <div className="res-header">
+                <span className="team-name">{title}</span>
+                <span className="total-score">{data.total_score}점</span>
+            </div>
+            
+            {/* 항목별 세부 점수 바 (scores 키 참조) */}
+            <div className="score-bars">
+                <ScoreBar label="주장 명확성" val={data.scores.clarity} max={25} />
+                <ScoreBar label="근거 적합성" val={data.scores.evidence} max={30} />
+                <ScoreBar label="상호작용" val={data.scores.interaction} max={25} />
+                <ScoreBar label="토론 태도" val={data.scores.attitude} max={20} />
+            </div>
+
+            {/* 상세 피드백 (feedback_text 키 참조) */}
+            <div className="feedback-body">
+                <div className="fb-label"><RiInformationLine /> 상세 평가 이유</div>
+                <div className="fb-text">{data.feedback_text}</div>
+                {data.fact_check_result && (
+                    <div className="fact-check-box">
+                        <strong>📌 Fact Check:</strong> {data.fact_check_result}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// 점수 바 컴포넌트
+function ScoreBar({ label, val, max }) {
+    const percent = (val / max) * 100;
+    return (
+        <div className="score-row">
+            <span className="label">{label}</span>
+            <div className="bar-bg"><div className="bar-fill" style={{width: `${percent}%`}}></div></div>
+            <span className="val">{val}</span>
+        </div>
+    );
+}
+
+// 사이드바 팀 섹션
 function TeamSection({ title, type, members }) {
     return (
         <div className={`team-section ${type}`}>
@@ -234,32 +350,6 @@ function TeamSection({ title, type, members }) {
                         </div>
                     </div>
                 ))}
-            </div>
-        </div>
-    );
-}
-
-// 컴포넌트 분리: 메시지 행
-function MessageRow({ msg, isMe }) {
-    if (msg.displayType === 'system') return <div className="system-message"><span>{msg.content}</span></div>;
-    
-    if (msg.displayType === 'moderator') return (
-        <div className="message-row moderator">
-            <div className="msg-avatar mod"><RiRobot2Line /></div>
-            <div className="msg-bubble mod">{msg.content}</div>
-        </div>
-    );
-
-    return (
-        <div className={`message-row ${msg.role} ${isMe ? 'me' : ''}`}>
-            {!isMe && (
-                <div className="msg-avatar">
-                    <img src={`https://api.dicebear.com/9.x/notionists/svg?seed=${msg.nickname}`} alt="p" />
-                </div>
-            )}
-            <div className="msg-content">
-                {!isMe && <span className="msg-name">{msg.nickname}</span>}
-                <div className={`msg-bubble ${msg.role}`}>{msg.content}</div>
             </div>
         </div>
     );
