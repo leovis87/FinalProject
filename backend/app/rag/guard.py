@@ -13,6 +13,7 @@ import re
 from typing import List, Literal, Optional
 
 from groq import Groq
+from rag.rag_config import GROQ_API_KEY
 
 Decision = Literal["OK", "REFINE", "REJECT", "FALLBACK"]
 
@@ -102,7 +103,7 @@ def guard_user_query(
     if rule_flag == "REPEAT":
         return _reject("반복 문자로 보이는 입력입니다.", ["repeat"])
 
-    api_key = os.getenv("GROQ_API_KEY", "")
+    api_key = os.getenv("GROQ_API_KEY", GROQ_API_KEY)
     if not api_key:
         return _fallback("모델 키가 없어 분류를 수행할 수 없습니다.", ["no_api_key"])
 
@@ -157,7 +158,7 @@ rule_flag: {rule_flag}
         data = json.loads(resp.choices[0].message.content)
     except Exception:
         return _fallback("모델 응답을 해석하지 못했습니다.", ["parse_error"])
-
+    print(data)
     decision = data.get("decision")
     if decision not in {"OK", "REFINE", "REJECT", "FALLBACK"}:
         return _fallback("모델 판단이 유효하지 않습니다.", ["invalid_decision"])
@@ -185,7 +186,7 @@ rule_flag: {rule_flag}
             ]
     else:
         recommended_examples_ko = None
-
+    print(decision, rule_flag)
     return GuardResult(
         decision=decision,
         reason_ko=reason_ko,

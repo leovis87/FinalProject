@@ -35,6 +35,7 @@ class Settings(BaseSettings):
 
     # LLM API
     GEMINI_API_KEY : str
+    TAVILY_API_KEY : str
 
     class Config:
         current_file_dir = os.path.dirname(os.path.abspath(__file__))

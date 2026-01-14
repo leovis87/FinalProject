@@ -16,7 +16,7 @@ LEVEL_MAPPING = {
     "elementary_high": "초등_고학년",
     "middle": "중학생",
     "high": "고등학생",
-    "all": None  # 'all'인 경우 필터링을 하지 않도록 처리 필요
+    "all": "청소년"  # 'all'인 경우 필터링을 하지 않도록 처리 필요
 }
 
 SUBJECT_MAPPING = {
