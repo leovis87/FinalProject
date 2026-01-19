@@ -554,12 +554,6 @@ def pro_turn_node_user(state: DebateState) -> DebateState:
     user_index = (state['current_turn'] -1) % len(state['pro_users'])
     current_user = state['pro_users'][user_index]
 
-    # 출력 예시: 🎙️ {current_user["user_name"]}님 차례입니다.'
-
-    # 사용자 입력
-    # Local test시:
-    # user_input = input('💬 찬성 의견: ')
-
     # 서버값 가져오기
     user_input = state.get('user_input', '')
     
@@ -596,13 +590,14 @@ def con_turn_node_user(state: DebateState) -> DebateState:
     current_user = state['con_users'][user_index]
 
     # 출력 예시: 🎙️ {current_user["user_name"]}님 차례입니다.'
+    print(f"🎙️ {current_user["user_name"]}")
 
     # 사용자 입력
     # Local test시:
-    # user_input = input('💬 찬성 의견: ')
+    user_input = input('💬 반대 의견: ')
 
     # 서버값 가져오기
-    user_input = state.get('user_input', '')
+    # user_input = state.get('user_input', '')
 
     # 빈 값 체크
     if not user_input:
@@ -688,22 +683,28 @@ def summary_node(state: DebateState,
     messages = state.get('messages', [])
 
     # 2. Error 방지용 초기화
-    last_pro_msg = "발언 없음"
-    last_con_msg = "발언 없음"
+    pro_msgs = []
+    con_msgs = []
 
-    # 3. 역순으로 탐색 (최신 메시지 -> 처음 메시지)
+    # 3. 전체 메시지 순회
     for msg in reversed(messages):
-        # (1) 찬성 측 최신 발언 찾기 (아직 못 찾았을 때만)
-        if last_pro_msg == "발언 없음" and msg.get('role') == 'pro':
-            last_pro_msg = msg.get('content')
+        # 해당 메시지가 '현재 턴'인지 확인
+        if msg.get('turn') == state['current_turn']:
 
-        # (2) 반대 측 최신 발언 찾기 (아직 못 찾았을 때만)
-        if last_con_msg == "발언 없음" and msg.get('role') == 'con':
-            last_con_msg = msg.get('content')
+            # 찬성 측 발언 수집
+            if msg.get('role') == 'pro':
+                # "발언자: 내용" 형태로 저장하여 AI가 해당 발언자도 기억하게 추가 수정
+                pro_msgs.append(f"{msg.get('user_name')}: {msg.get('content')}")
 
-        # (3) 둘다 찾으면 더 이상 과거를 찾을 필요가 없어짐 == 종료
-        if last_pro_msg != "발언 없음" and last_con_msg != "발언 없음":
-            break
+            # 반대 측 발언 수집
+            elif msg.get('role') == 'cone':
+                # "발언자: 내용" 형태로 저장하여 AI가 해당 발언자도 기억하게 추가 수정
+                con_msgs.append(f"{msg.get('user_name')}: {msg.get('content')}")
+
+    # 4. 리스트를 하나의 문자열로 합치기 (발언이 없으면 "발언 없음" 처리)
+    # join 사용
+    last_pro_msg = "\n".join(pro_msgs) if pro_msgs else "발언 없음"
+    last_con_msg = "\n".join(con_msgs) if con_msgs else "발언 없음"
 
     # ============================================
     # 🏗️ Prompt 구성 (압축 요약 유도)
@@ -951,8 +952,11 @@ def moderator_shared_node(state: DebateState,
         {
             'type': 'text',
             'text': f"""
+[참가자 level]
+{state['level']}
+
 [Role]
-너는 10년 이상 경력의 중고등학생 토론 코치야.
+너는 10년 이상 경력의 {state['level']} 토론 코치야.
 
 [찬성 팀]
 {pro_info}
@@ -973,7 +977,8 @@ def moderator_shared_node(state: DebateState,
 1. 전체 토론 요약
 2. 각 팀별 채점 (학생 논술 평가 기준)
 3. 주요 주장 fact-check (검색 필수)
-4. 구체적 근거와 출처 제시
+4. 검색 툴 사용 시, 꼭 {datetime.now().strftime('%Y년 %m월 %d일')}을 기준으로 검색할 것.
+5. 구체적 근거와 출처 제시
 
 '채점항목'
 아래 4가지 항목에 대해 각 팀별로 점수를 매겨줘.
