@@ -1,55 +1,67 @@
 import enum
 
-# 소셜 로그인
+# ?�셜 로그??
 class AuthProvider(str, enum.Enum):
     TEST = "test"
     KAKAO = "kakao"
     NAVER = "naver"
 
-# 토론 난이도
+# ?�론 ?�이??
 class DebateLevel(str, enum.Enum):
-    ELEMENTARY_LOW = "elementary_low"   # 초(저학년)
-    ELEMENTARY_HIGH = "elementary_high" # 초(고학년)
-    MIDDLE = "middle"                   # 중
-    HIGH = "high"                       # 고
-    ALL = "all"                         # 전체
+    ELEMENTARY_LOW = "elementary_low"   # �??�?�년)
+    ELEMENTARY_HIGH = "elementary_high" # �?고학??
+    MIDDLE = "middle"                   # �?
+    HIGH = "high"                       # �?
+    ALL = "all"                         # ?�체
 
-# 토론 과목 카테고리
+# ?�론 과목 카테고리
 class DebateCategory(str, enum.Enum):
-    KOREAN = "korean"       # 국어
-    SOCIAL = "social"       # 사회
-    MORAL = "moral"         # 도덕
-    ETHICS = "ethics"       # 윤리
+    KOREAN = "korean"       # �?��
+    SOCIAL = "social"       # ?�회
+    MORAL = "moral"         # ?�덕
+    ETHICS = "ethics"       # ?�리
 
-# 토론방 상태
+# ?�론�??�태
 class DebateStatus(str, enum.Enum):
-    WAITING = "waiting"                 # 대기
-    IN_PROGRESS_INTRO = "in_progress_intro"           # 입론 중
-    IN_PROGRESS_REBUTTAL = "in_progress_rebuttal"     # 반론 중
-    IN_PROGRESS_REREBUTTAL = "in_progress_rerebuttal" # 재반론 중
-    IN_PROGRESS_CONCLUSION = "in_progress_conclusion" # 최종 발언 중
-    IN_PROGRESS_VOTING = "in_progress_voting"         # 평가 중
-    FINISHED = "finished"               # 끝
+    WAITING = "waiting"                 # ?��?
+    IN_PROGRESS_INTRO = "in_progress_intro"           # ?�론 �?
+    IN_PROGRESS_REBUTTAL = "in_progress_rebuttal"     # 반론 �?
+    IN_PROGRESS_REREBUTTAL = "in_progress_rerebuttal" # ?�반�?�?
+    IN_PROGRESS_CONCLUSION = "in_progress_conclusion" # 최종 발언 �?
+    IN_PROGRESS_VOTING = "in_progress_voting"         # ?��? �?
+    FINISHED = "finished"               # ??
 
-# 토론 진영
+# ?�론 진영
 class DebateRole(str, enum.Enum):
     PRO = "pro"             # 찬성
-    CON = "con"             # 반대
-    OBSERVER = "observer"   # 관전자
+    CON = "con"             # 반�?
+    OBSERVER = "observer"   # 관?�자
 
-# 배지 종류
+# 배�? 종류
+# Debate result per participant
+class DebateResult(str, enum.Enum):
+    WIN = "win"
+    LOSE = "lose"
+    DRAW = "draw"
+
+# Decision source for results
+class DebateDecisionBy(str, enum.Enum):
+    AI = "ai"
+    ADMIN = "admin"
+    SYSTEM = "system"
+
 class BadgeType(str, enum.Enum):
-    NOVICE = "새싹 토론가"
-    BLOOMING = "피어나는 토론가"
-    PASSIONATE = "열혈 토론가"
-    POPULAR = "인기 토론가"
-    KING = "토론왕"
+    NOVICE = "novice"
+    BLOOMING = "blooming"
+    PASSIONATE = "passionate"
+    POPULAR = "popular"
+    KING = "king"
 
 class DebateStatus(str, enum.Enum):
-    WAITING = "waiting"              # 대기 중
-    PROCEEDING = "proceeding"        # 진행 중 (추가됨)
-    IN_PROGRESS_INTRO = "intro"      # 입론
+    WAITING = "waiting"              # ?��?�?
+    PROCEEDING = "proceeding"        # 진행 �?(추�???
+    IN_PROGRESS_INTRO = "intro"      # ?�론
     IN_PROGRESS_REBUTTAL = "rebuttal" # 반론
-    IN_PROGRESS_REREBUTTAL = "rerebuttal" # 재반론
+    IN_PROGRESS_REREBUTTAL = "rerebuttal" # ?�반�?
     IN_PROGRESS_CONCLUSION = "conclusion" # 결론
     FINISHED = "finished"            # 종료

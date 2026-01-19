@@ -9,7 +9,7 @@ from models.debate_room import DebateRoom
 from models.debate_participant import DebateParticipant
 from models.user import User
 from models.enums import DebateStatus, BadgeType, DebateRole, DebateLevel, DebateCategory
-from schemas.debate import DebateRoomCreate
+from schemas.debate import DebateRoomCreate, DebateResultUpsertRequest
 from rag.indexer import load_topics_csv
 
 class DebateService:
@@ -119,6 +119,94 @@ class DebateService:
         await db.refresh(new_participant)
 
         return new_participant
+
+    async def get_debate_history(self, db: AsyncSession, user_id: int) -> list[dict]:
+        """Return finished debates for a user."""
+        query = select(DebateParticipant, DebateRoom).join(
+            DebateRoom,
+            DebateParticipant.debate_room_id == DebateRoom.debate_room_id
+        ).where(
+            DebateParticipant.user_id == user_id,
+            DebateRoom.status == DebateStatus.FINISHED
+        ).order_by(
+            desc(DebateRoom.finished_at),
+            desc(DebateRoom.started_at),
+            desc(DebateRoom.created_at)
+        )
+
+        result = await db.execute(query)
+        rows = result.all()
+
+        items = []
+        for participant, room in rows:
+            items.append({
+                "debate_room_id": room.debate_room_id,
+                "title": room.title,
+                "topic": room.topic,
+                "category": room.category,
+                "level": room.level,
+                "status": room.status,
+                "role": participant.role,
+                "result": participant.result,
+                "result_reason": participant.result_reason,
+                "joined_at": participant.joined_at,
+                "started_at": room.started_at,
+                "finished_at": room.finished_at
+            })
+
+        return items
+
+    async def set_debate_results(
+        self,
+        db: AsyncSession,
+        debate_id: int,
+        payload: DebateResultUpsertRequest
+    ) -> dict:
+        """Set final results for a debate room."""
+        query = select(DebateRoom).options(
+            selectinload(DebateRoom.participants)
+        ).where(DebateRoom.debate_room_id == debate_id)
+        result = await db.execute(query)
+        room = result.scalar_one_or_none()
+
+        if not room:
+            raise ValueError("Debate room not found.")
+
+        participants = {p.user_id: p for p in room.participants}
+        requested_ids = {item.user_id for item in payload.results}
+        valid_ids = set(participants.keys())
+        missing_ids = {p.user_id for p in room.participants if p.role != DebateRole.OBSERVER} - requested_ids
+        extra_ids = requested_ids - valid_ids
+
+        if missing_ids:
+            raise ValueError("Missing results for participants.")
+        if extra_ids:
+            raise ValueError("Invalid participant in results.")
+
+        decided_at = datetime.now()
+
+        for item in payload.results:
+            participant = participants.get(item.user_id)
+            if not participant:
+                continue
+            participant.result = item.result
+            participant.result_reason = payload.result_reason
+            participant.result_decided_at = decided_at
+            participant.result_decided_by = payload.decided_by
+            db.add(participant)
+
+        room.status = DebateStatus.FINISHED
+        if room.finished_at is None:
+            room.finished_at = decided_at
+        db.add(room)
+
+        await db.commit()
+
+        return {
+            "debate_room_id": room.debate_room_id,
+            "decided_at": decided_at,
+            "decided_by": payload.decided_by
+        }
 
     async def random_match(
         self,

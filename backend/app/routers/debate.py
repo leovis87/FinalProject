@@ -6,7 +6,15 @@ from core.database import get_db
 from routers.user import get_current_user
 from models.enums import DebateRole
 from models.user import User
-from schemas.debate import DebateRoomCreate, DebateRoomResponse, RandomMatchRequest, RandomMatchResponse
+from schemas.debate import (
+    DebateRoomCreate,
+    DebateRoomResponse,
+    RandomMatchRequest,
+    RandomMatchResponse,
+    DebateHistoryItem,
+    DebateResultUpsertRequest,
+    DebateResultUpsertResponse
+)
 from services.debate import debate_service
 
 router = APIRouter(prefix="/api/debates", tags=["토론방"])
@@ -45,6 +53,13 @@ async def random_match(
         max_turns=payload.max_turns
     )
 
+@router.get("/history", response_model=List[DebateHistoryItem])
+async def get_debate_history(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return await debate_service.get_debate_history(db, current_user.user_id)
+
 @router.get("/{debate_id}", response_model=DebateRoomResponse)
 async def get_debate_room(
     debate_id: int,
@@ -53,6 +68,18 @@ async def get_debate_room(
     # Tip: 참가자 정보까지 한번에 로딩하려면 select options(joinedload)를 써야 할 수도 있습니다.
     # 간단하게는 service에서 구현
     return await debate_service.get_debate_room_details(db, debate_id)
+
+@router.post("/{debate_id}/result", response_model=DebateResultUpsertResponse)
+async def set_debate_results(
+    debate_id: int,
+    payload: DebateResultUpsertRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        return await debate_service.set_debate_results(db, debate_id, payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/{debate_id}/join")
 async def join_debate(

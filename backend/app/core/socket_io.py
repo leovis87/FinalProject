@@ -4,8 +4,10 @@ import os
 import sys
 import socketio
 import traceback
-from datetime import datetime
+import random
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
+from random import randint
 
 from langgraph.types import Command
 
@@ -40,7 +42,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from models.debate_room import DebateRoom
 from models.debate_participant import DebateParticipant
-from models.enums import DebateStatus, DebateRole
+from models.enums import DebateStatus, DebateRole, DebateResult, DebateDecisionBy
+from schemas.debate import DebateResultUpsertRequest, DebateResultItem
+from services.debate import debate_service
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 sio_app = socketio.ASGIApp(sio)
@@ -50,12 +54,70 @@ _room_locks: Dict[str, asyncio.Lock] = {}
 _active_users: Dict[str, set] = {}
 _sid_to_room: Dict[str, str] = {}
 _sid_to_user: Dict[str, str] = {}
+_turn_timers: Dict[str, asyncio.Task] = {}
+_selection_timers: Dict[str, asyncio.Task] = {}
+
+TURN_TIMEOUT_SEC = int(os.getenv("TURN_TIMEOUT_SEC", "90"))
+SELECTION_TIMEOUT_SEC = int(os.getenv("SELECTION_TIMEOUT_SEC", "20"))
 
 
 def _get_lock(room_id: str) -> asyncio.Lock:
     if room_id not in _room_locks:
         _room_locks[room_id] = asyncio.Lock()
     return _room_locks[room_id]
+
+
+def _cancel_turn_timer(room_id: str) -> None:
+    task = _turn_timers.pop(room_id, None)
+    current = asyncio.current_task()
+    if task and task is not current and not task.done():
+        task.cancel()
+
+
+def _start_turn_timer(room_state: dict, room_id_str: str) -> None:
+    if TURN_TIMEOUT_SEC <= 0:
+        room_state["turn_deadline"] = None
+        return
+    if room_state.get("is_finished"):
+        room_state["turn_deadline"] = None
+        return
+    expected = _next_speaker(room_state)
+    if not expected:
+        room_state["turn_deadline"] = None
+        return
+
+    _cancel_turn_timer(room_id_str)
+    expected_user_id = str(expected["user_id"])
+    round_number = room_state.get("current_round")
+    room_state["turn_deadline"] = datetime.now(timezone.utc) + timedelta(seconds=TURN_TIMEOUT_SEC)
+
+    async def _timeout():
+        try:
+            await asyncio.sleep(TURN_TIMEOUT_SEC)
+        except asyncio.CancelledError:
+            return
+        async with _get_lock(room_id_str):
+            current_state = _room_states.get(room_id_str)
+            if not current_state or current_state.get("is_finished"):
+                return
+            current_expected = _next_speaker(current_state)
+            if not current_expected:
+                return
+            if str(current_expected["user_id"]) != expected_user_id:
+                return
+            if current_state.get("current_round") != round_number:
+                return
+            await _emit_system_message(current_state, "Moderator: 발언 시간이 종료되었습니다.")
+            await _complete_turn(current_state, room_id_str, expected_user_id, reason="timeout")
+
+    _turn_timers[room_id_str] = asyncio.create_task(_timeout())
+
+
+def _cancel_selection_timer(room_id: str) -> None:
+    task = _selection_timers.pop(room_id, None)
+    current = asyncio.current_task()
+    if task and task is not current and not task.done():
+        task.cancel()
 
 
 def _debug_payload(level: str, tag: str, room_id: Optional[str], user_id: Optional[str], detail: str) -> dict:
@@ -107,7 +169,9 @@ def _role_value(role) -> str:
 
 def _to_json_safe(value):
     if isinstance(value, datetime):
-        return value.isoformat()
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.isoformat(timespec="seconds")
     if isinstance(value, dict):
         return {k: _to_json_safe(v) for k, v in value.items()}
     if isinstance(value, list):
@@ -135,6 +199,20 @@ def _sorted_participants(participants: List[DebateParticipant]) -> List[dict]:
     return normalized
 
 
+def _participants_payload(participants: List[DebateParticipant]) -> List[dict]:
+    payload = []
+    for p in participants:
+        payload.append(
+            {
+                "user_id": int(p.user_id) if p.user_id is not None else p.user_id,
+                "role": _role_value(p.role),
+                "turn_order": getattr(p, "turn_order", None),
+                "nickname": p.nickname if hasattr(p, "nickname") else f"User_{p.user_id}",
+            }
+        )
+    return payload
+
+
 def _build_room_state(room: DebateRoom, participants: List[DebateParticipant]) -> dict:
     ordered = _sorted_participants(participants)
     pro_users = [u for u in ordered if u["side"] == "pro"]
@@ -145,6 +223,7 @@ def _build_room_state(room: DebateRoom, participants: List[DebateParticipant]) -
     return {
         "room_id": str(room.debate_room_id),
         "topic": room.topic,
+        "level": room.level.value if hasattr(room.level, "value") else str(room.level),
         "participants": ordered,
         "participant_map": {u["user_id"]: u for u in ordered},
         "pro_users": pro_users,
@@ -162,6 +241,12 @@ def _build_room_state(room: DebateRoom, participants: List[DebateParticipant]) -
         "last_spoken": {u["user_id"]: 0 for u in ordered},
         "global_spoken_seq": 0,
         "topic_analysis": None,
+        "is_finished": False,
+        "draft_buffers": {},
+        "selection_active": False,
+        "selection_round": None,
+        "selection_deadline": None,
+        "selection_requests": {"pro": set(), "con": set()},
     }
 
 
@@ -169,6 +254,7 @@ def _graph_base_state(room_state: dict) -> dict:
     return {
         "room_id": int(room_state["room_id"]),
         "topic": room_state["topic"],
+        "level": room_state.get("level"),
         "topic_analysis": room_state.get("topic_analysis"),
         "pro_users": [
             {
@@ -251,6 +337,60 @@ def _format_moderator_report(report) -> str:
     return "\n".join(lines)
 
 
+def _parse_total_score(value) -> Optional[int]:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_result_payload(room_state: dict, report_data: Optional[dict]) -> Optional[DebateResultUpsertRequest]:
+    if not report_data:
+        return None
+
+    pro_eval = report_data.get("pro_eval") or {}
+    con_eval = report_data.get("con_eval") or {}
+    pro_score = _parse_total_score(pro_eval.get("total_score"))
+    con_score = _parse_total_score(con_eval.get("total_score"))
+
+    if pro_score is None or con_score is None:
+        return None
+
+    if pro_score > con_score:
+        pro_result = DebateResult.WIN
+        con_result = DebateResult.LOSE
+    elif pro_score < con_score:
+        pro_result = DebateResult.LOSE
+        con_result = DebateResult.WIN
+    else:
+        pro_result = DebateResult.DRAW
+        con_result = DebateResult.DRAW
+
+    results = []
+    for participant in room_state.get("participants", []):
+        side = participant.get("side")
+        if side == "pro":
+            result = pro_result
+        elif side == "con":
+            result = con_result
+        else:
+            continue
+        try:
+            user_id = int(participant.get("user_id"))
+        except (TypeError, ValueError):
+            continue
+        results.append(DebateResultItem(user_id=user_id, result=result))
+
+    if not results:
+        return None
+
+    return DebateResultUpsertRequest(
+        results=results,
+        result_reason=report_data.get("general_summary") or "",
+        decided_by=DebateDecisionBy.AI
+    )
+
+
 def _choose_representative(users: List[dict], room_state: dict) -> Optional[dict]:
     spoken = room_state["per_round_spoken_set"].get(room_state["current_round"], set())
     candidates = [u for u in users if u["user_id"] not in spoken]
@@ -262,11 +402,20 @@ def _choose_representative(users: List[dict], room_state: dict) -> Optional[dict
     return candidates[0]
 
 
-def _set_round(room_state: dict, round_number: int) -> List[str]:
+def _prepare_round(room_state: dict, round_number: int) -> None:
     room_state["current_round"] = round_number
     room_state["turn_index"] = 0
     room_state["per_round_spoken_set"][round_number] = set()
     room_state["round_messages"][round_number] = []
+    room_state["draft_buffers"] = {}
+
+
+def _set_round(room_state: dict, round_number: int) -> List[str]:
+    _prepare_round(room_state, round_number)
+    room_state["selection_active"] = False
+    room_state["selection_round"] = None
+    room_state["selection_deadline"] = None
+    room_state["selection_requests"] = {"pro": set(), "con": set()}
     skipped = []
 
     if round_number in (2, 3):
@@ -291,6 +440,100 @@ def _set_round(room_state: dict, round_number: int) -> List[str]:
     room_state["representative"] = {"pro": None, "con": None}
     room_state["turn_order"] = list(room_state["participants"])
     return skipped
+
+
+def _needs_selection(room_state: dict, round_number: int) -> bool:
+    if round_number not in (2, 3):
+        return False
+    if SELECTION_TIMEOUT_SEC <= 0:
+        return False
+    return len(room_state.get("pro_users", [])) > 1 or len(room_state.get("con_users", [])) > 1
+
+
+def _start_selection_phase(room_state: dict, room_id_str: str, round_number: int) -> None:
+    _cancel_turn_timer(room_id_str)
+    _cancel_selection_timer(room_id_str)
+    _prepare_round(room_state, round_number)
+    room_state["representative"] = {"pro": None, "con": None}
+    room_state["turn_order"] = []
+    room_state["turn_deadline"] = None
+    room_state["selection_active"] = True
+    room_state["selection_round"] = round_number
+    room_state["selection_deadline"] = datetime.now(timezone.utc) + timedelta(seconds=SELECTION_TIMEOUT_SEC)
+    room_state["selection_requests"] = {"pro": set(), "con": set()}
+
+    async def _timeout():
+        try:
+            await asyncio.sleep(SELECTION_TIMEOUT_SEC)
+        except asyncio.CancelledError:
+            return
+        async with _get_lock(room_id_str):
+            current_state = _room_states.get(room_id_str)
+            if not current_state or current_state.get("is_finished"):
+                return
+            if not current_state.get("selection_active"):
+                return
+            if current_state.get("selection_round") != round_number:
+                return
+            await _finalize_selection(current_state, room_id_str)
+
+    _selection_timers[room_id_str] = asyncio.create_task(_timeout())
+
+
+def _pick_representative_from_requests(room_state: dict, side: str) -> Optional[dict]:
+    requests = room_state.get("selection_requests", {}).get(side, set())
+    candidates = [
+        u for u in room_state.get(f"{side}_users", [])
+        if str(u["user_id"]) in requests
+    ]
+    if candidates:
+        return random.choice(candidates)
+    return _choose_representative(room_state.get(f"{side}_users", []), room_state)
+
+
+async def _finalize_selection(room_state: dict, room_id_str: str) -> None:
+    _cancel_selection_timer(room_id_str)
+    room_state["selection_active"] = False
+    room_state["selection_deadline"] = None
+    room_state["selection_round"] = None
+
+    rep_pro = _pick_representative_from_requests(room_state, "pro")
+    rep_con = _pick_representative_from_requests(room_state, "con")
+
+    room_state["representative"] = {
+        "pro": rep_pro["user_id"] if rep_pro else None,
+        "con": rep_con["user_id"] if rep_con else None,
+    }
+
+    skipped = []
+    turn_order = []
+    if rep_pro:
+        turn_order.append(rep_pro)
+    else:
+        skipped.append("PRO")
+    if rep_con:
+        turn_order.append(rep_con)
+    else:
+        skipped.append("CON")
+
+    room_state["turn_order"] = turn_order
+    room_state["turn_index"] = 0
+    room_state["selection_requests"] = {"pro": set(), "con": set()}
+
+    if skipped:
+        for side in skipped:
+            await _emit_system_message(room_state, f"Moderator: {side} has no available speaker. Skipping.")
+
+    _start_turn_timer(room_state, room_id_str)
+    await sio.emit(
+        "debate_update",
+        {
+            "messages": [],
+            "replace_messages": False,
+            **_round_payload(room_state),
+        },
+        room=f"debate_{room_id_str}",
+    )
 
 
 def _round_status(round_number: int) -> DebateStatus:
@@ -318,6 +561,10 @@ def _round_payload(room_state: dict) -> dict:
         "turn_index": room_state.get("turn_index"),
         "turn_total": len(room_state.get("turn_order", [])),
         "next_speaker": expected,
+        "turn_deadline": room_state.get("turn_deadline"),
+        "selection_active": room_state.get("selection_active", False),
+        "selection_deadline": room_state.get("selection_deadline"),
+        "selection_round": room_state.get("selection_round"),
     }
     return _to_json_safe(payload)
 
@@ -355,6 +602,40 @@ async def _emit_system_message(room_state: dict, content: str) -> None:
     )
 
 
+def _make_loading_message(room_state: dict, content: str) -> dict:
+    return {
+        "turn": room_state.get("current_round", 0),
+        "role": "ai",
+        "user_name": "Moderator",
+        "content": content,
+        "display_type": "loading",
+    }
+
+
+async def _emit_loading_message(room_state: dict, content: str) -> None:
+    message = _make_loading_message(room_state, content)
+    await sio.emit(
+        "debate_update",
+        _message_payload(message, room_state, replace=False),
+        room=f"debate_{room_state['room_id']}",
+    )
+
+
+async def _emit_loading_end(room_state: dict) -> None:
+    message = {
+        "turn": room_state.get("current_round", 0),
+        "role": "ai",
+        "user_name": "Moderator",
+        "content": "",
+        "display_type": "loading_end",
+    }
+    await sio.emit(
+        "debate_update",
+        _message_payload(message, room_state, replace=False),
+        room=f"debate_{room_state['room_id']}",
+    )
+
+
 def _run_topic_summary(room_state: dict) -> Optional[dict]:
     state = _graph_base_state(room_state)
     config = _graph_config(f"debate_{room_state['room_id']}_topic")
@@ -376,6 +657,120 @@ def _run_round_summary(room_state: dict, round_number: int) -> str:
     return f"[Round {round_number}] Summary unavailable."
 
 
+async def _complete_turn(
+    room_state: dict,
+    room_id_str: str,
+    user_id: str,
+    sid: Optional[str] = None,
+    reason: str = "manual",
+) -> None:
+    expected = _next_speaker(room_state)
+    if expected and str(expected["user_id"]) != str(user_id):
+        await sio.emit("debate_error", {"message": "Not your turn."}, to=sid)
+        return
+
+    _cancel_turn_timer(room_id_str)
+
+    buffer = room_state.get("draft_buffers", {}).pop(str(user_id), [])
+    combined = " ".join([chunk.strip() for chunk in buffer if chunk.strip()]).strip()
+    if not combined:
+        combined = "발언 없음"
+
+    participant = _participant_for(room_state, str(user_id))
+    role = participant["side"] if participant else "user"
+    user_name = participant["user_name"] if participant else f"User_{user_id}"
+
+    message = {
+        "turn": room_state["current_round"],
+        "role": role,
+        "user_id": str(user_id),
+        "user_name": user_name,
+        "content": combined,
+    }
+
+    room_state["messages"].append(message)
+    room_state["dialogue_messages"].append(message)
+    room_state["round_messages"].setdefault(room_state["current_round"], []).append(message)
+
+    room_state["turn_index"] += 1
+    room_state["global_spoken_seq"] += 1
+    room_state["last_spoken"][str(user_id)] = room_state["global_spoken_seq"]
+    room_state["per_round_spoken_set"][room_state["current_round"]].add(str(user_id))
+
+    has_next_turn = room_state["turn_index"] < len(room_state["turn_order"])
+    if has_next_turn:
+        _start_turn_timer(room_state, room_id_str)
+
+    await sio.emit(
+        "debate_update",
+        _message_payload(message, room_state, replace=False),
+        room=f"debate_{room_id_str}",
+    )
+
+    if has_next_turn:
+        return
+
+    round_number = room_state["current_round"]
+
+    try:
+        await _emit_loading_message(room_state, "AI가 입력중입니다")
+        summary_text = _run_round_summary(room_state, round_number)
+        await _emit_system_message(room_state, summary_text)
+    except Exception:
+        traceback.print_exc()
+    finally:
+        await _emit_loading_end(room_state)
+
+    if round_number >= 4:
+        await _finalize_debate(room_state, room_id_str, sid=sid)
+        return
+
+    next_round = round_number + 1
+
+    if _needs_selection(room_state, next_round):
+        _start_selection_phase(room_state, room_id_str, next_round)
+        await _emit_system_message(room_state, "Moderator: 발언 신청을 시작합니다.")
+
+        async with AsyncSessionLocal() as db:
+            room = await db.get(DebateRoom, int(room_id_str))
+            if room:
+                room.status = _round_status(next_round)
+                await db.commit()
+
+        await sio.emit(
+            "debate_update",
+            {
+                "messages": [],
+                "replace_messages": False,
+                **_round_payload(room_state),
+            },
+            room=f"debate_{room_id_str}",
+        )
+        return
+
+    skipped = _set_round(room_state, next_round)
+    if skipped:
+        for side in skipped:
+            await _emit_system_message(room_state, f"Moderator: {side} has no available speaker. Skipping.")
+
+    async with AsyncSessionLocal() as db:
+        room = await db.get(DebateRoom, int(room_id_str))
+        if room:
+            room.status = _round_status(next_round)
+            await db.commit()
+
+    _start_turn_timer(room_state, room_id_str)
+    await sio.emit(
+        "debate_update",
+        {
+            "messages": [],
+            "replace_messages": False,
+            **_round_payload(room_state),
+        },
+        room=f"debate_{room_id_str}",
+    )
+
+
 # 1. 기존의 _format_moderator_report는 삭제하고 이 함수를 추가하세요.
 def _get_final_report_data(room_state: dict) -> Optional[dict]:
     """사회자 최종 리포트 객체를 생성하고 JSON safe한 dict로 반환합니다."""
@@ -391,6 +786,53 @@ def _get_final_report_data(room_state: dict) -> Optional[dict]:
     return _to_json_safe(report)
 
 # 2. 시스템 메시지에 display_type을 넣을 수 있도록 수정하세요.
+async def _finalize_debate(room_state: dict, room_id_str: str, sid: Optional[str] = None) -> None:
+    _cancel_turn_timer(room_id_str)
+    _cancel_selection_timer(room_id_str)
+    room_state["turn_deadline"] = None
+    room_state["selection_active"] = False
+    room_state["selection_deadline"] = None
+    room_state["selection_round"] = None
+    report_data = None
+    try:
+        await _emit_loading_message(room_state, "AI가 입력중입니다")
+        report_data = _get_final_report_data(room_state)
+        if report_data:
+            await _emit_system_message(room_state, report_data.get("general_summary", ""), "report_summary")
+            await _emit_system_message(room_state, report_data.get("pro_eval", {}), "report_pro")
+            await _emit_system_message(room_state, report_data.get("con_eval", {}), "report_con")
+            if report_data.get("best_player"):
+                await _emit_system_message(room_state, report_data["best_player"], "report_mvp")
+    except Exception:
+        traceback.print_exc()
+        await _emit_error("Final report failed.", room_id_str, sid=sid)
+    finally:
+        await _emit_loading_end(room_state)
+
+    saved_result = False
+    payload = _build_result_payload(room_state, report_data)
+    if payload:
+        try:
+            async with AsyncSessionLocal() as db:
+                await debate_service.set_debate_results(db, int(room_id_str), payload)
+            saved_result = True
+        except Exception:
+            traceback.print_exc()
+            await _emit_error("Final result save failed.", room_id_str, sid=sid)
+
+    if not saved_result:
+        async with AsyncSessionLocal() as db:
+            room = await db.get(DebateRoom, int(room_id_str))
+            if room:
+                room.status = DebateStatus.FINISHED
+                if not room.finished_at:
+                    room.finished_at = datetime.utcnow()
+                await db.commit()
+
+    room_state["is_finished"] = True
+    await sio.emit("debate_ended", {"room_id": room_id_str}, room=f"debate_{room_id_str}")
+
+
 async def _emit_system_message(room_state: dict, content: str, display_type: str = "moderator") -> None:
     message = {
         "turn": room_state.get("current_round", 0),
@@ -427,6 +869,7 @@ async def handle_join(sid, data):
     side = None
     participant_count = 0
     active_count = len(_active_users.get(room_id, set()))
+    participants = []
     try:
         async with AsyncSessionLocal() as db:
             part_stmt = (
@@ -456,18 +899,20 @@ async def handle_join(sid, data):
     _debug_print(payload)
     await _emit_debug(payload, room_id, sid=sid)
 
+    if participants:
+        await sio.emit("participants_update", {"participants": _participants_payload(participants)}, room=f"debate_{room_id}")
+
     if room_id in _room_states:
         room_state = _room_states[room_id]
-        if room_state.get("messages"):
-            await sio.emit(
-                "debate_update",
-                {
-                    "messages": list(room_state["messages"]),
-                    "replace_messages": True,
-                    **_round_payload(room_state),
-                },
-                to=sid,
-            )
+        await sio.emit(
+            "debate_update",
+            {
+                "messages": list(room_state.get("messages", [])),
+                "replace_messages": True,
+                **_round_payload(room_state),
+            },
+            to=sid,
+        )
 
 
 @sio.on("start_debate")
@@ -551,10 +996,18 @@ async def handle_start(sid, data):
 
                 room_state = _build_room_state(room, participants)
                 _room_states[room_id_str] = room_state
-                await _emit_system_message(room_state, "Debate started. Round 1 begins.")
+                start_msgs = [
+                    "여러분의 멋진 생각을 들려줄 토론의 문이 열렸습니다. 준비한 만큼 당당하게 이야기를 시작해 볼까요?",
+                    "기다리던 토론 시간입니다! 반짝이는 아이디어와 날카로운 논리가 가득한 시간, 지금 바로 시작합니다.",
+                    "토론 시작! 친구의 생각에 귀를 기울이며 논리적인 대화를 나누어 보아요.",
+                    "생각의 힘을 기르는 토론의 장이 마련되었습니다. 서로 다른 의견이 만나 어떤 결론을 만들어낼지 기대하며 시작해 보겠습니다."
+                ]
+                num_msg = randint(0, len(start_msgs))
+                await _emit_system_message(room_state, start_msgs[num_msg])
 
                 # Topic summary at debate start (LLM).
                 try:
+                    await _emit_loading_message(room_state, "AI가 입력중입니다")
                     graph_payload = _debug_payload("info", "GRAPH", room_id_str, str(user_id), "topic_summary start")
                     _debug_print(graph_payload, state=str(room.status))
                     await _emit_debug(graph_payload, room_id_str, sid=sid)
@@ -568,6 +1021,8 @@ async def handle_start(sid, data):
                 except Exception:
                     traceback.print_exc()
                     await _emit_error("Topic summary failed.", room_id_str, sid=sid)
+                finally:
+                    await _emit_loading_end(room_state)
 
                 _set_round(room_state, 1)
                 previous_status = room.status
@@ -584,6 +1039,7 @@ async def handle_start(sid, data):
                 _debug_print(state_payload, state=str(room.status))
                 await _emit_debug(state_payload, room_id_str, sid=sid)
 
+                _start_turn_timer(room_state, room_id_str)
                 await sio.emit(
                     "debate_update",
                     {
@@ -600,13 +1056,58 @@ async def handle_start(sid, data):
                 await _emit_error("Failed to start debate.", room_id_str, sid=sid)
 
 
-@sio.on("send_message")
-async def handle_message(sid, data):
+@sio.on("end_debate")
+async def handle_end(sid, data):
     room_id = data.get("room_id")
     user_id = data.get("user_id")
-    content = data.get("content")
+    if not room_id or not user_id:
+        return
 
-    if not room_id or not user_id or not content:
+    room_id_str = str(room_id)
+    lock = _get_lock(room_id_str)
+
+    async with lock:
+        payload = _debug_payload("info", "END", room_id_str, str(user_id), "end_debate received")
+        _debug_print(payload)
+        await _emit_debug(payload, room_id_str, sid=sid)
+
+        async with AsyncSessionLocal() as db:
+            try:
+                room = await db.get(DebateRoom, int(room_id))
+                if not room:
+                    await sio.emit("debate_error", {"message": "토론방을 찾을 수 없습니다.."}, to=sid)
+                    await _emit_error("Room not found.", room_id_str, sid=sid)
+                    return
+
+                if room.creator_id != int(user_id):
+                    await sio.emit("debate_error", {"message": "방장이 토론을 종료 할 수 있습니다."}, to=sid)
+                    await _emit_error("Only the creator can end the debate.", room_id_str, sid=sid)
+                    return
+
+                if room.status == DebateStatus.FINISHED:
+                    await sio.emit("debate_ended", {"room_id": room_id_str}, room=f"debate_{room_id_str}")
+                    return
+
+                room_state = _room_states.get(room_id_str)
+                if room_state:
+                    await _emit_system_message(room_state, "방장에 의해 토론이 종료되었습니다.")
+                    await _finalize_debate(room_state, room_id_str, sid=sid)
+                else:
+                    room.status = DebateStatus.FINISHED
+                    if not room.finished_at:
+                        room.finished_at = datetime.utcnow()
+                    await db.commit()
+                    await sio.emit("debate_ended", {"room_id": room_id_str}, room=f"debate_{room_id_str}")
+            except Exception:
+                traceback.print_exc()
+                await _emit_error("Failed to end debate.", room_id_str, sid=sid)
+
+
+@sio.on("end_speaking")
+async def handle_end_speaking(sid, data):
+    room_id = data.get("room_id")
+    user_id = data.get("user_id")
+    if not room_id or not user_id:
         return
 
     room_id_str = str(room_id)
@@ -616,6 +1117,95 @@ async def handle_message(sid, data):
         room_state = _room_states.get(room_id_str)
         if not room_state:
             await sio.emit("debate_error", {"message": "Room state not ready."}, to=sid)
+            return
+
+        if room_state.get("is_finished"):
+            await sio.emit("debate_error", {"message": "Debate has ended."}, to=sid)
+            return
+
+        if room_state.get("selection_active"):
+            await sio.emit("debate_error", {"message": "Selection in progress."}, to=sid)
+            return
+
+        if room_state.get("current_round", 0) == 0:
+            await sio.emit("debate_error", {"message": "Debate has not started."}, to=sid)
+            return
+
+        expected = _next_speaker(room_state)
+        if not expected or str(expected["user_id"]) != str(user_id):
+            await sio.emit("debate_error", {"message": "Not your turn."}, to=sid)
+            return
+
+        await _complete_turn(room_state, room_id_str, str(user_id), sid=sid, reason="manual")
+
+
+@sio.on("raise_hand")
+async def handle_raise_hand(sid, data):
+    room_id = data.get("room_id")
+    user_id = data.get("user_id")
+    if not room_id or not user_id:
+        return
+
+    room_id_str = str(room_id)
+    lock = _get_lock(room_id_str)
+
+    async with lock:
+        room_state = _room_states.get(room_id_str)
+        if not room_state:
+            await sio.emit("debate_error", {"message": "Room state not ready."}, to=sid)
+            return
+
+        if room_state.get("is_finished"):
+            await sio.emit("debate_error", {"message": "Debate has ended."}, to=sid)
+            return
+
+        if not room_state.get("selection_active"):
+            await sio.emit("debate_error", {"message": "Selection is not active."}, to=sid)
+            return
+
+        participant = _participant_for(room_state, str(user_id))
+        if not participant:
+            await sio.emit("debate_error", {"message": "You are not a participant."}, to=sid)
+            return
+
+        side = participant.get("side")
+        if side not in ("pro", "con"):
+            await sio.emit("debate_error", {"message": "Observers cannot request to speak."}, to=sid)
+            return
+
+        room_state.setdefault("selection_requests", {"pro": set(), "con": set()})
+        room_state["selection_requests"].setdefault(side, set()).add(str(user_id))
+
+
+@sio.on("send_message")
+async def handle_message(sid, data):
+    room_id = data.get("room_id")
+    user_id = data.get("user_id")
+    content = data.get("content")
+
+    if not room_id or not user_id:
+        return
+    if not content:
+        return
+    content = content.strip()
+    if not content:
+        return
+
+    room_id_str = str(room_id)
+    lock = _get_lock(room_id_str)
+
+    async with lock:
+        room_state = _room_states.get(room_id_str)
+        if not room_state:
+            await sio.emit("debate_error", {"message": "Room state not ready."}, to=sid)
+            return
+
+        if room_state.get("is_finished"):
+            await sio.emit("debate_error", {"message": "Debate has ended."}, to=sid)
+            return
+
+        if room_state.get("selection_active"):
+            await sio.emit("debate_error", {"message": "Selection in progress."}, to=sid)
             return
 
         if room_state.get("current_round", 0) == 0:
@@ -636,102 +1226,24 @@ async def handle_message(sid, data):
             }, to=sid)
             return
 
-        # 메시지 데이터 생성
         role = participant["side"]
-        message = {
+        room_state.setdefault("draft_buffers", {})
+        room_state["draft_buffers"].setdefault(str(user_id), []).append(content)
+
+        draft_message = {
             "turn": room_state["current_round"],
             "role": role,
             "user_id": str(user_id),
             "user_name": data.get("user_name") or participant["user_name"],
             "content": content,
+            "display_type": "draft",
         }
 
-        # 상태 기록
-        room_state["messages"].append(message)
-        room_state["dialogue_messages"].append(message)
-        room_state["round_messages"].setdefault(room_state["current_round"], []).append(message)
-        
-        # 차례 인덱스 증가 (먼저 증가시켜야 next_speaker가 올바르게 전송됨)
-        room_state["turn_index"] += 1
-        room_state["global_spoken_seq"] += 1
-        room_state["last_spoken"][str(user_id)] = room_state["global_spoken_seq"]
-        room_state["per_round_spoken_set"][room_state["current_round"]].add(str(user_id))
-
-        # 발언 업데이트 전송
         await sio.emit(
             "debate_update",
-            _message_payload(message, room_state, replace=False),
+            _message_payload(draft_message, room_state, replace=False),
             room=f"debate_{room_id_str}",
         )
-
-        # 라운드 종료 여부 확인 (발언할 사람이 남았으면 함수 종료)
-        if room_state["turn_index"] < len(room_state["turn_order"]):
-            return
-
-        # --- 라운드가 종료된 시점 (Round Completed) ---
-        round_number = room_state["current_round"]
-        
-        # 1. 라운드 요약 생성
-        try:
-            summary_text = _run_round_summary(room_state, round_number)
-            await _emit_system_message(room_state, summary_text)
-        except Exception:
-            traceback.print_exc()
-
-        # 2. 최종 판결 (4라운드 종료 시)
-        if round_number >= 4:
-            try:
-                # 위에서 정의한 헬퍼 함수 호출
-                report_data = _get_final_report_data(room_state)
-                
-                if report_data:
-                    # 데이터를 각각의 display_type으로 찢어서 4번 전송
-                    await _emit_system_message(room_state, report_data.get("general_summary", ""), "report_summary")
-                    await _emit_system_message(room_state, report_data.get("pro_eval", {}), "report_pro")
-                    await _emit_system_message(room_state, report_data.get("con_eval", {}), "report_con")
-                    if report_data.get("best_player"):
-                        await _emit_system_message(room_state, report_data["best_player"], "report_mvp")
-
-            except Exception:
-                traceback.print_exc()
-                await _emit_error("Final report failed.", room_id_str, sid=sid)
-            
-            # 방 상태를 종료로 변경
-            async with AsyncSessionLocal() as db:
-                room = await db.get(DebateRoom, int(room_id_str))
-                if room:
-                    room.status = DebateStatus.FINISHED
-                    await db.commit()
-            return
-
-        # 3. 다음 라운드 이동 로직 (1~3 라운드 종료 시)
-        # ⭐ [해결] 여기서 next_round 변수를 명확히 정의함
-        next_round = round_number + 1
-        
-        # 새로운 라운드 세팅 (_set_round 함수 활용)
-        skipped = _set_round(room_state, next_round)
-        if skipped:
-            for side in skipped:
-                await _emit_system_message(room_state, f"Moderator: {side} has no available speaker. Skipping.")
-
-        # DB 라운드 상태 업데이트
-        async with AsyncSessionLocal() as db:
-            room = await db.get(DebateRoom, int(room_id_str))
-            if room:
-                room.status = _round_status(next_round)
-                await db.commit()
-
-        # 클라이언트에 다음 라운드 정보 전송
-        await sio.emit(
-            "debate_update",
-            {
-                "messages": [],
-                "replace_messages": False,
-                **_round_payload(room_state),
-            },
-            room=f"debate_{room_id_str}",
-        )
-
 
 @sio.event
 async def disconnect(sid):

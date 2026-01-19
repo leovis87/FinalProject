@@ -216,6 +216,32 @@
     outline-offset: 2px;
 }
 
+.end-debate-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #dc2626;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 10px 20px rgba(220, 38, 38, 0.25);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.end-debate-btn:hover {
+    background-color: #b91c1c;
+    transform: translateY(-1px);
+}
+
+.end-debate-btn:focus-visible {
+    outline: 3px solid rgba(220, 38, 38, 0.3);
+    outline-offset: 2px;
+}
+
 .topic-box {
     display: flex;
     align-items: center;
@@ -294,6 +320,10 @@
     gap: 6px;
     font-weight: 700;
     font-size: 13px;
+}
+
+.timer-remaining {
+    font-weight: 800;
 }
 
 .chat-window {
@@ -380,6 +410,22 @@
     color: var(--text-strong);
 }
 
+.msg-bubble.draft {
+    border-style: dashed;
+    background-color: #f8fafc;
+    opacity: 0.8;
+}
+
+.draft-label {
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
 .msg-bubble.pro {
     border-color: rgba(37, 99, 235, 0.3);
 }
@@ -404,6 +450,36 @@
     color: #1d4ed8;
     font-weight: 600;
     text-align: center;
+}
+
+.loading-dots {
+    display: inline-flex;
+    margin-left: 2px;
+}
+
+.loading-dots span {
+    opacity: 0;
+    animation: loading-dot 1.2s infinite;
+}
+
+.loading-dots span:first-child {
+    opacity: 1;
+    animation: none;
+}
+
+.loading-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.loading-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes loading-dot {
+    0% { opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
 }
 
 .report-item,
@@ -626,6 +702,62 @@
     box-shadow: 0 8px 18px rgba(37, 99, 235, 0.25);
 }
 
+.end-turn-btn {
+    height: 48px;
+    padding: 0 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(220, 38, 38, 0.35);
+    background-color: #fff;
+    color: #b91c1c;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 6px 14px rgba(220, 38, 38, 0.12);
+}
+
+.end-turn-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background-color: #fee2e2;
+}
+
+.end-turn-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    box-shadow: none;
+}
+
+.raise-hand-btn {
+    height: 48px;
+    padding: 0 16px;
+    border-radius: 12px;
+    border: 1px dashed rgba(37, 99, 235, 0.5);
+    background-color: #eff6ff;
+    color: #1d4ed8;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 6px 14px rgba(37, 99, 235, 0.12);
+}
+
+.raise-hand-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background-color: #dbeafe;
+}
+
+.raise-hand-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    box-shadow: none;
+}
+
 .send-btn:hover:not(:disabled) {
     transform: translateY(-1px);
     background-color: #1d4ed8;
@@ -703,7 +835,8 @@
         align-items: flex-start;
     }
 
-    .start-debate-btn {
+    .start-debate-btn,
+    .end-debate-btn {
         width: 100%;
         justify-content: center;
     }
@@ -745,14 +878,23 @@
     .send-btn {
         width: 100%;
     }
+
+    .end-turn-btn,
+    .raise-hand-btn {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .participant-card,
     .start-debate-btn,
+    .end-debate-btn,
     .msg-bubble,
     .bar-fill,
-    .send-btn {
+    .send-btn,
+    .end-turn-btn,
+    .raise-hand-btn {
         transition: none;
         animation: none;
     }

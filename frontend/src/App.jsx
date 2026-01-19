@@ -3,6 +3,7 @@ import Layout from "./components/Layout"
 import MainPage from "./pages/MainPage"
 import DebatePage from "./pages/DebatePage"
 import SocialCallbackPage from "./pages/SocialCallbackPage"
+import MyPage from "./pages/MyPage"
 import { AuthProvider } from "./contexts/AuthContext"
 
 function App() {
@@ -11,6 +12,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<MainPage />} />
+          <Route path="mypage" element={<MyPage />} />
         </Route>
         <Route path="debate/room/:roomId" element={<DebatePage />} />
         <Route path="/social/callback" element={<SocialCallbackPage />} />

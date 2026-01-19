@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, ForeignKey, Enum as SAEnum, DateTime, func, UniqueConstraint
+from sqlalchemy import Column, Integer, ForeignKey, Enum as SAEnum, DateTime, func, UniqueConstraint, Text
 from sqlalchemy.orm import relationship
 from core.database import Base
-from .enums import DebateRole
+from .enums import DebateRole, DebateResult, DebateDecisionBy
 
 class DebateParticipant(Base):
     __tablename__ = "debate_participants"
@@ -15,6 +15,17 @@ class DebateParticipant(Base):
     )
 
     turn_order = Column(Integer, nullable=True) 
+
+    result = Column(
+        SAEnum(DebateResult, name="debate_result_enum", native_enum=False),
+        nullable=True
+    )
+    result_reason = Column(Text, nullable=True)
+    result_decided_at = Column(DateTime(timezone=True), nullable=True)
+    result_decided_by = Column(
+        SAEnum(DebateDecisionBy, name="debate_decision_by_enum", native_enum=False),
+        nullable=True
+    )
 
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
 

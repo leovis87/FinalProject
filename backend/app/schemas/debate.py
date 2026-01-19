@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, List
 from datetime import datetime
 
-from models.enums import DebateCategory, DebateLevel, DebateStatus, DebateRole
+from models.enums import DebateCategory, DebateLevel, DebateStatus, DebateRole, DebateResult, DebateDecisionBy
 
 class DebateRoomCreate(BaseModel):
     title: str = Field(..., max_length=100, description="토론방 제목")
@@ -87,3 +87,31 @@ class RandomMatchResponse(BaseModel):
     joined_role: DebateRole
     matched_existing: bool
     queued: bool
+
+class DebateHistoryItem(BaseModel):
+    debate_room_id: int
+    title: str
+    topic: str
+    category: DebateCategory
+    level: DebateLevel
+    status: DebateStatus
+    role: DebateRole
+    result: DebateResult | None = None
+    result_reason: Optional[str] = None
+    joined_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+
+class DebateResultItem(BaseModel):
+    user_id: int
+    result: DebateResult
+
+class DebateResultUpsertRequest(BaseModel):
+    results: List[DebateResultItem]
+    result_reason: Optional[str] = None
+    decided_by: DebateDecisionBy = DebateDecisionBy.AI
+
+class DebateResultUpsertResponse(BaseModel):
+    debate_room_id: int
+    decided_at: datetime
+    decided_by: DebateDecisionBy
