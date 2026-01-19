@@ -226,6 +226,15 @@ class DebateState(TypedDict):
     #   {'topic': ' ... ', .....}, 반복
     # ]
     topic_analysis: Optional[TopicBriefing]
+    level: Optional[str]
+
+    #     LEVEL_MAPPING = {
+    #         "elementary_low": "초등_저학년",
+    #         "elementary_high": "초등_고학년",
+    #         "middle": "중학생",
+    #         "high": "고등학생",
+    #         "all": None  # 'all'인 경우 필터링을 하지 않도록 처리 필요
+    #     }
 
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     # 각 팀별 참가자 정보
@@ -328,6 +337,7 @@ class DebateState(TypedDict):
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     # 추후 사용할 가능성이 있는 것들
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    
     user_input: str             # 사용자 입력
     latest_pro_message: str     # 찬성 최신 발언
     latest_con_message: str     # 반대 최신 발언
