@@ -183,6 +183,14 @@
     gap: 12px;
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 .room-title {
     font-size: clamp(18px, 2.2vw, 24px);
     font-weight: 800;
@@ -239,6 +247,32 @@
 
 .end-debate-btn:focus-visible {
     outline: 3px solid rgba(220, 38, 38, 0.3);
+    outline-offset: 2px;
+}
+
+.leave-debate-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #0f172a;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.leave-debate-btn:hover {
+    background-color: #1f2937;
+    transform: translateY(-1px);
+}
+
+.leave-debate-btn:focus-visible {
+    outline: 3px solid rgba(15, 23, 42, 0.3);
     outline-offset: 2px;
 }
 
@@ -370,6 +404,7 @@
 .msg-avatar {
     width: 36px;
     height: 36px;
+    flex: 0 0 36px;
     border-radius: 50%;
     overflow: hidden;
     background-color: #fff;
@@ -377,6 +412,18 @@
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+.msg-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.msg-avatar svg {
+    width: 20px;
+    height: 20px;
 }
 
 .msg-avatar.mod {
@@ -405,6 +452,7 @@
     line-height: 1.5;
     box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06);
     word-break: break-word;
+    white-space: pre-wrap;
     background-color: #fff;
     border: 1px solid var(--border-color);
     color: var(--text-strong);
@@ -449,7 +497,7 @@
     border: 1px solid #bfdbfe;
     color: #1d4ed8;
     font-weight: 600;
-    text-align: center;
+    text-align: left;
 }
 
 .loading-dots {
@@ -835,8 +883,14 @@
         align-items: flex-start;
     }
 
+    .header-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
     .start-debate-btn,
-    .end-debate-btn {
+    .end-debate-btn,
+    .leave-debate-btn {
         width: 100%;
         justify-content: center;
     }
@@ -890,6 +944,7 @@
     .participant-card,
     .start-debate-btn,
     .end-debate-btn,
+    .leave-debate-btn,
     .msg-bubble,
     .bar-fill,
     .send-btn,

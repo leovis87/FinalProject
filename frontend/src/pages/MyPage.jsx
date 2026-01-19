@@ -10,12 +10,18 @@ import {
     Tooltip
 } from "recharts";
 import "../styles/MyPage.css";
+import "../styles/Modal.css";
 
 function MyPage() {
     const { user } = useAuth();
     const [historyRecords, setHistoryRecords] = useState([]);
     const [historyStatus, setHistoryStatus] = useState("idle");
     const [historyError, setHistoryError] = useState("");
+    const [replayOpen, setReplayOpen] = useState(false);
+    const [replayStatus, setReplayStatus] = useState("idle");
+    const [replayError, setReplayError] = useState("");
+    const [replayMessages, setReplayMessages] = useState([]);
+    const [replayMeta, setReplayMeta] = useState(null);
 
     const mockProfile = useMemo(() => ({
         nickname: user?.nickname || "Guest",
@@ -135,6 +141,47 @@ function MyPage() {
         { id: 4, name: "피드백 상위 10%", earned: false },
     ];
 
+    const handleOpenReplay = async (record) => {
+        const token = localStorage.getItem("access_token");
+        if (!token || !record?.id) {
+            setReplayError("리플레이를 불러올 수 없습니다.");
+            setReplayMessages([]);
+            setReplayStatus("error");
+            return;
+        }
+
+        setReplayOpen(true);
+        setReplayMeta(record);
+        setReplayStatus("loading");
+        setReplayError("");
+        setReplayMessages([]);
+
+        try {
+            const response = await fetch(`http://localhost:8000/api/debates/${record.id}/messages`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            if (!response.ok) {
+                throw new Error("리플레이 불러오기 실패");
+            }
+            const data = await response.json();
+            setReplayMessages(Array.isArray(data) ? data : []);
+            setReplayStatus("success");
+        } catch (error) {
+            setReplayStatus("error");
+            setReplayError(error?.message || "리플레이 불러오기 실패");
+        }
+    };
+
+    const handleCloseReplay = () => {
+        setReplayOpen(false);
+        setReplayMessages([]);
+        setReplayStatus("idle");
+        setReplayError("");
+        setReplayMeta(null);
+    };
+
     return (
         <MyPageLayout>
             <StatsOverview stats={stats} />
@@ -144,9 +191,19 @@ function MyPage() {
                 historyRecords={historyRecords}
                 historyStatus={historyStatus}
                 historyError={historyError}
+                onReplay={handleOpenReplay}
                 badges={badges}
                 nickname={mockProfile.nickname}
             />
+            {replayOpen && (
+                <ReplayModal
+                    record={replayMeta}
+                    status={replayStatus}
+                    error={replayError}
+                    messages={replayMessages}
+                    onClose={handleCloseReplay}
+                />
+            )}
         </MyPageLayout>
     );
 }
@@ -203,7 +260,7 @@ function StatsOverview({ stats }) {
     );
 }
 
-function ActivityTabs({ activityData, recentDebates, historyRecords, historyStatus, historyError, badges, nickname }) {
+function ActivityTabs({ activityData, recentDebates, historyRecords, historyStatus, historyError, onReplay, badges, nickname }) {
     const [activeTab, setActiveTab] = useState("summary");
 
     return (
@@ -244,7 +301,12 @@ function ActivityTabs({ activityData, recentDebates, historyRecords, historyStat
                     <ActivitySummaryTab activityData={activityData} recentDebates={recentDebates} />
                 )}
                 {activeTab === "history" && (
-                    <HistoryTab historyRecords={historyRecords} historyStatus={historyStatus} historyError={historyError} />
+                    <HistoryTab
+                        historyRecords={historyRecords}
+                        historyStatus={historyStatus}
+                        historyError={historyError}
+                        onReplay={onReplay}
+                    />
                 )}
                 {activeTab === "badges" && <BadgesTab badges={badges} />}
                 {activeTab === "settings" && <SettingsTab nickname={nickname} />}
@@ -313,7 +375,7 @@ function ActivitySummaryTab({ activityData, recentDebates }) {
     );
 }
 
-function HistoryTab({ historyRecords, historyStatus, historyError }) {
+function HistoryTab({ historyRecords, historyStatus, historyError, onReplay }) {
     return (
         <div className="history-tab">
             <div className="history-filters">
@@ -353,12 +415,59 @@ function HistoryTab({ historyRecords, historyStatus, historyError }) {
                             <button type="button" className="mypage-action-btn secondary small">
                                 판결문
                             </button>
-                            <button type="button" className="mypage-action-btn ghost small">
+                            <button
+                                type="button"
+                                className="mypage-action-btn ghost small"
+                                onClick={() => onReplay?.(record)}
+                            >
                                 리플레이
                             </button>
                         </div>
                     </div>
                 ))}
+            </div>
+        </div>
+    );
+}
+
+function ReplayModal({ record, status, error, messages, onClose }) {
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content replay-modal" onClick={(event) => event.stopPropagation()}>
+                <button type="button" className="modal-close-btn" onClick={onClose} aria-label="닫기">
+                    ×
+                </button>
+                <div className="replay-header">
+                    <h2 className="replay-title">토론 리플레이</h2>
+                    <div className="replay-meta">
+                        <span>{record?.title || "토론 제목 없음"}</span>
+                        <span>{record?.date || "-"}</span>
+                        <span>{record?.role || "-"}</span>
+                        <span>{record?.result || "-"}</span>
+                    </div>
+                </div>
+                <div className="replay-body">
+                    {status === "loading" && <div className="replay-status">리플레이를 불러오는 중...</div>}
+                    {status === "error" && <div className="replay-status error">{error || "불러오지 못했습니다."}</div>}
+                    {status === "success" && messages.length === 0 && (
+                        <div className="replay-status">표시할 메시지가 없습니다.</div>
+                    )}
+                    {status === "success" && messages.length > 0 && (
+                        <div className="replay-list">
+                            {messages.map((msg) => (
+                                <div key={msg.message_id} className={`replay-message ${msg.role}`}>
+                                    <div className="replay-message-head">
+                                        <span className="replay-role">{msg.user_name || msg.role}</span>
+                                        <span className="replay-time">
+                                            {msg.turn ? `Turn ${msg.turn}` : "-"}
+                                        </span>
+                                    </div>
+                                    <div className="replay-content">{msg.content}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

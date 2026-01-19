@@ -16,6 +16,8 @@ Base = declarative_base()
 
 async def init_db():
     try:
+        # Ensure all model modules are imported so metadata is complete.
+        import models  # noqa: F401
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             print("✅ 데이터베이스 테이블이 성공적으로 생성되었습니다.")

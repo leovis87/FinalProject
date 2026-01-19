@@ -102,6 +102,17 @@ class DebateHistoryItem(BaseModel):
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
 
+class DebateMessageResponse(BaseModel):
+    message_id: int
+    debate_room_id: int
+    user_id: Optional[int] = None
+    user_name: Optional[str] = None
+    role: str
+    display_type: Optional[str] = None
+    content: str
+    turn: Optional[int] = None
+    created_at: datetime
+
 class DebateResultItem(BaseModel):
     user_id: int
     result: DebateResult

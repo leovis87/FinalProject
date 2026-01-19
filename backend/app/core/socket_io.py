@@ -1,10 +1,12 @@
 # app/core/socket_io.py
 import asyncio
+import json
 import os
 import sys
 import socketio
 import traceback
 import random
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from random import randint
@@ -41,6 +43,7 @@ from core.database import AsyncSessionLocal
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from models.debate_room import DebateRoom
+from models.debate_message import DebateMessage
 from models.debate_participant import DebateParticipant
 from models.enums import DebateStatus, DebateRole, DebateResult, DebateDecisionBy
 from schemas.debate import DebateResultUpsertRequest, DebateResultItem
@@ -160,6 +163,32 @@ async def _emit_error(message: str, room_id: Optional[str], sid: Optional[str] =
     except Exception:
         traceback.print_exc()
 
+
+async def _save_message(room_state: dict, message: dict) -> None:
+    content = message.get("content", "")
+    if not isinstance(content, str):
+        content = json.dumps(_to_json_safe(content), ensure_ascii=False)
+
+    user_id = message.get("user_id")
+    try:
+        user_id = int(user_id) if user_id is not None else None
+    except (TypeError, ValueError):
+        user_id = None
+
+    try:
+        async with AsyncSessionLocal() as db:
+            db_message = DebateMessage(
+                debate_room_id=int(room_state["room_id"]),
+                user_id=user_id,
+                role=str(message.get("role", "system")),
+                display_type=message.get("display_type"),
+                content=content,
+                turn=message.get("turn"),
+            )
+            db.add(db_message)
+            await db.commit()
+    except Exception:
+        traceback.print_exc()
 
 def _role_value(role) -> str:
     if isinstance(role, DebateRole):
@@ -289,9 +318,9 @@ def _graph_base_state(room_state: dict) -> dict:
     }
 
 
-def _format_topic_analysis(topic_analysis) -> str:
+def _format_topic_analysis_parts(topic_analysis) -> Optional[dict]:
     if not topic_analysis:
-        return "Topic summary is not available."
+        return None
     if hasattr(topic_analysis, "model_dump"):
         data = topic_analysis.model_dump()
     elif hasattr(topic_analysis, "dict"):
@@ -299,16 +328,16 @@ def _format_topic_analysis(topic_analysis) -> str:
     elif isinstance(topic_analysis, dict):
         data = topic_analysis
     else:
-        return str(topic_analysis)
+        return {"summary": str(topic_analysis), "pro": "", "con": ""}
 
     description = data.get("description", "")
     pro_args = data.get("pro_args", [])
     con_args = data.get("con_args", [])
-    return (
-        f"Topic summary: {description}\n"
-        f"Pro points: {', '.join(pro_args)}\n"
-        f"Con points: {', '.join(con_args)}"
-    )
+    return {
+        "summary": description,
+        "pro": "\n".join([f"- {item}" for item in pro_args if item]),
+        "con": "\n".join([f"- {item}" for item in con_args if item]),
+    }
 
 
 def _format_moderator_report(report) -> str:
@@ -657,6 +686,28 @@ def _run_round_summary(room_state: dict, round_number: int) -> str:
     return f"[Round {round_number}] Summary unavailable."
 
 
+def _parse_round_summary(summary_text: str) -> Optional[dict]:
+    if not summary_text:
+        return None
+    lines = [line.strip() for line in summary_text.splitlines() if line.strip()]
+    pro_text = ""
+    con_text = ""
+    for line in lines:
+        if not pro_text:
+            match = re.search(r"(?:🔵\s*)?찬성\s*[:：]\s*(.+)", line)
+            if match:
+                pro_text = match.group(1).strip()
+                continue
+        if not con_text:
+            match = re.search(r"(?:🔴\s*)?반대\s*[:：]\s*(.+)", line)
+            if match:
+                con_text = match.group(1).strip()
+                continue
+    if not pro_text and not con_text:
+        return None
+    return {"pro": pro_text, "con": con_text}
+
+
 async def _complete_turn(
     room_state: dict,
     room_id_str: str,
@@ -691,6 +742,7 @@ async def _complete_turn(
     room_state["messages"].append(message)
     room_state["dialogue_messages"].append(message)
     room_state["round_messages"].setdefault(room_state["current_round"], []).append(message)
+    await _save_message(room_state, message)
 
     room_state["turn_index"] += 1
     room_state["global_spoken_seq"] += 1
@@ -715,7 +767,19 @@ async def _complete_turn(
     try:
         await _emit_loading_message(room_state, "AI가 입력중입니다")
         summary_text = _run_round_summary(room_state, round_number)
-        await _emit_system_message(room_state, summary_text)
+        parts = _parse_round_summary(summary_text)
+        if not parts:
+            await _emit_system_message(room_state, summary_text)
+        else:
+            await _emit_system_message(room_state, f"{round_number}라운드가 종료되었습니다.")
+            await _emit_system_message(
+                room_state,
+                f"찬성측의 입장은 다음과 같습니다.\n - {parts.get('pro', '')}",
+            )
+            await _emit_system_message(
+                room_state,
+                f"반대측의 입장은 다음과 같습니다.\n - {parts.get('con', '')}",
+            )
     except Exception:
         traceback.print_exc()
     finally:
@@ -842,11 +906,41 @@ async def _emit_system_message(room_state: dict, content: str, display_type: str
         "display_type": display_type  # 프론트에서 '찢어서' 보게 해주는 핵심 키
     }
     room_state["messages"].append(message)
+    await _save_message(room_state, message)
     await sio.emit(
         "debate_update",
         _message_payload(message, room_state, replace=False),
         room=f"debate_{room_state['room_id']}",
     )
+
+
+async def _close_room_if_empty(room_id_str: str, room_state: Optional[dict]) -> None:
+    active_count = len(_active_users.get(room_id_str, set()))
+    if active_count > 0:
+        return
+
+    if room_state and room_state.get("is_finished"):
+        return
+
+    _cancel_turn_timer(room_id_str)
+    _cancel_selection_timer(room_id_str)
+
+    if room_state:
+        room_state["is_finished"] = True
+        room_state["turn_deadline"] = None
+        room_state["selection_active"] = False
+        room_state["selection_deadline"] = None
+        room_state["selection_round"] = None
+
+    async with AsyncSessionLocal() as db:
+        room = await db.get(DebateRoom, int(room_id_str))
+        if room and room.status != DebateStatus.FINISHED:
+            room.status = DebateStatus.FINISHED
+            if not room.finished_at:
+                room.finished_at = datetime.utcnow()
+            await db.commit()
+
+    await sio.emit("debate_ended", {"room_id": room_id_str}, room=f"debate_{room_id_str}")
 
 
 @sio.event
@@ -997,10 +1091,10 @@ async def handle_start(sid, data):
                 room_state = _build_room_state(room, participants)
                 _room_states[room_id_str] = room_state
                 start_msgs = [
-                    "여러분의 멋진 생각을 들려줄 토론의 문이 열렸습니다. 준비한 만큼 당당하게 이야기를 시작해 볼까요?",
-                    "기다리던 토론 시간입니다! 반짝이는 아이디어와 날카로운 논리가 가득한 시간, 지금 바로 시작합니다.",
-                    "토론 시작! 친구의 생각에 귀를 기울이며 논리적인 대화를 나누어 보아요.",
-                    "생각의 힘을 기르는 토론의 장이 마련되었습니다. 서로 다른 의견이 만나 어떤 결론을 만들어낼지 기대하며 시작해 보겠습니다."
+                    "여러분의 멋진 생각을 들려줄 토론의 문이 열렸습니다.\n준비한 만큼 당당하게 이야기를 시작해 볼까요?",
+                    "기다리던 토론 시간입니다!\n반짝이는 아이디어와 날카로운 논리가 가득한 시간, 지금 바로 시작합니다.",
+                    "토론 시작!\n친구의 생각에 귀를 기울이며 논리적인 대화를 나누어 보아요.",
+                    "생각의 힘을 기르는 토론의 장이 마련되었습니다.\n서로 다른 의견이 만나 어떤 결론을 만들어낼지 기대하며 시작해 보겠습니다."
                 ]
                 num_msg = randint(0, len(start_msgs))
                 await _emit_system_message(room_state, start_msgs[num_msg])
@@ -1013,8 +1107,19 @@ async def handle_start(sid, data):
                     await _emit_debug(graph_payload, room_id_str, sid=sid)
                     topic_analysis = _run_topic_summary(room_state)
                     room_state["topic_analysis"] = topic_analysis
-                    topic_text = _format_topic_analysis(topic_analysis)
-                    await _emit_system_message(room_state, topic_text)
+                    parts = _format_topic_analysis_parts(topic_analysis)
+                    if not parts:
+                        await _emit_system_message(room_state, "Topic summary is not available.")
+                    else:
+                        await _emit_system_message(room_state, f"{parts['summary']}")
+                        await _emit_system_message(
+                            room_state,
+                            f"찬성측 입장은 다음과 같습니다.\n{parts['pro']}",
+                        )
+                        await _emit_system_message(
+                            room_state,
+                            f"반대측 입장은 다음과 같습니다.\n{parts['con']}",
+                        )
                     graph_payload = _debug_payload("info", "GRAPH", room_id_str, str(user_id), "topic_summary done")
                     _debug_print(graph_payload, state=str(room.status))
                     await _emit_debug(graph_payload, room_id_str, sid=sid)
@@ -1245,6 +1350,45 @@ async def handle_message(sid, data):
             room=f"debate_{room_id_str}",
         )
 
+@sio.on("leave_debate")
+async def handle_leave_debate(sid, data):
+    room_id = str(data.get("room_id")) if data else None
+    user_id = str(data.get("user_id")) if data and data.get("user_id") is not None else None
+
+    mapped_room = _sid_to_room.pop(sid, None)
+    mapped_user = _sid_to_user.pop(sid, None)
+    if mapped_room:
+        room_id = mapped_room
+    if mapped_user:
+        user_id = mapped_user
+
+    if room_id:
+        await sio.leave_room(sid, f"debate_{room_id}")
+
+    if room_id and user_id:
+        if room_id in _active_users:
+            _active_users[room_id].discard(user_id)
+
+        active_count = len(_active_users.get(room_id, set()))
+        side = None
+        total_count = None
+        room_state = _room_states.get(room_id)
+        if room_state:
+            participant = _participant_for(room_state, user_id)
+            if participant:
+                side = participant.get("side")
+            total_count = len(room_state.get("participants", []))
+        payload = _debug_payload(
+            "info",
+            "LEAVE",
+            room_id,
+            user_id,
+            f"side={side} total_count={total_count} active_count={active_count}",
+        )
+        _debug_print(payload)
+        await _emit_debug(payload, room_id, sid=sid)
+        await _close_room_if_empty(room_id, room_state)
+
 @sio.event
 async def disconnect(sid):
     room_id = _sid_to_room.pop(sid, None)
@@ -1270,6 +1414,7 @@ async def disconnect(sid):
         )
         _debug_print(payload)
         await _emit_debug(payload, room_id, sid=sid)
+        await _close_room_if_empty(room_id, room_state)
     payload = _debug_payload("info", "DISCONNECT", None, None, f"sid={sid}")
     _debug_print(payload)
     await _emit_debug(payload, None, sid=sid)
