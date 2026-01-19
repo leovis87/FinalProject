@@ -1,9 +1,10 @@
 .slide-panel-container {
     position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: calc(100% - 400px);
+    top: var(--lobby-padding, 0px);
+    right: var(--lobby-padding, 0px);
+    bottom: var(--lobby-padding, 0px);
+    left: calc(var(--lobby-padding, 0px) + var(--lobby-left-width, 0px));
+    width: auto;
     background: rgba(255, 255, 255, 0.98);
     backdrop-filter: blur(20px);
     z-index: 50;

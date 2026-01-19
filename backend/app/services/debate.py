@@ -2,12 +2,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
 from sqlalchemy.orm import selectinload
 from datetime import datetime
+from pathlib import Path
+from random import choice
 
 from models.debate_room import DebateRoom
 from models.debate_participant import DebateParticipant
 from models.user import User
-from models.enums import DebateStatus, BadgeType
-from schemas.debate import DebateRoomCreate
+from models.enums import DebateStatus, BadgeType, DebateRole, DebateLevel, DebateCategory
+from schemas.debate import DebateRoomCreate, DebateResultUpsertRequest
+from rag.indexer import load_topics_csv
 
 class DebateService:
     async def create_debate_room(self, db: AsyncSession, debate_create: DebateRoomCreate, creator_id: int) -> DebateRoom:
@@ -116,6 +119,284 @@ class DebateService:
         await db.refresh(new_participant)
 
         return new_participant
+
+    async def get_debate_history(self, db: AsyncSession, user_id: int) -> list[dict]:
+        """Return finished debates for a user."""
+        query = select(DebateParticipant, DebateRoom).join(
+            DebateRoom,
+            DebateParticipant.debate_room_id == DebateRoom.debate_room_id
+        ).where(
+            DebateParticipant.user_id == user_id,
+            DebateRoom.status == DebateStatus.FINISHED
+        ).order_by(
+            desc(DebateRoom.finished_at),
+            desc(DebateRoom.started_at),
+            desc(DebateRoom.created_at)
+        )
+
+        result = await db.execute(query)
+        rows = result.all()
+
+        items = []
+        for participant, room in rows:
+            items.append({
+                "debate_room_id": room.debate_room_id,
+                "title": room.title,
+                "topic": room.topic,
+                "category": room.category,
+                "level": room.level,
+                "status": room.status,
+                "role": participant.role,
+                "result": participant.result,
+                "result_reason": participant.result_reason,
+                "joined_at": participant.joined_at,
+                "started_at": room.started_at,
+                "finished_at": room.finished_at
+            })
+
+        return items
+
+    async def set_debate_results(
+        self,
+        db: AsyncSession,
+        debate_id: int,
+        payload: DebateResultUpsertRequest
+    ) -> dict:
+        """Set final results for a debate room."""
+        query = select(DebateRoom).options(
+            selectinload(DebateRoom.participants)
+        ).where(DebateRoom.debate_room_id == debate_id)
+        result = await db.execute(query)
+        room = result.scalar_one_or_none()
+
+        if not room:
+            raise ValueError("Debate room not found.")
+
+        participants = {p.user_id: p for p in room.participants}
+        requested_ids = {item.user_id for item in payload.results}
+        valid_ids = set(participants.keys())
+        missing_ids = {p.user_id for p in room.participants if p.role != DebateRole.OBSERVER} - requested_ids
+        extra_ids = requested_ids - valid_ids
+
+        if missing_ids:
+            raise ValueError("Missing results for participants.")
+        if extra_ids:
+            raise ValueError("Invalid participant in results.")
+
+        decided_at = datetime.now()
+
+        for item in payload.results:
+            participant = participants.get(item.user_id)
+            if not participant:
+                continue
+            participant.result = item.result
+            participant.result_reason = payload.result_reason
+            participant.result_decided_at = decided_at
+            participant.result_decided_by = payload.decided_by
+            db.add(participant)
+
+        room.status = DebateStatus.FINISHED
+        if room.finished_at is None:
+            room.finished_at = decided_at
+        db.add(room)
+
+        await db.commit()
+
+        return {
+            "debate_room_id": room.debate_room_id,
+            "decided_at": decided_at,
+            "decided_by": payload.decided_by
+        }
+
+    async def random_match(
+        self,
+        db: AsyncSession,
+        user_id: int,
+        level: DebateLevel,
+        category: DebateCategory | None,
+        max_users: int,
+        max_turns: int
+    ) -> dict:
+        """랜덤 토론방 매칭 또는 생성"""
+        room = await self._match_existing_room(db, user_id, level, category)
+        if room:
+            return room
+
+        return await self._create_random_room(db, user_id, level, category, max_users, max_turns)
+
+    async def _match_existing_room(
+        self,
+        db: AsyncSession,
+        user_id: int,
+        level: DebateLevel,
+        category: DebateCategory | None
+    ) -> dict | None:
+        query = select(DebateRoom).options(
+            selectinload(DebateRoom.participants)
+        ).where(
+            DebateRoom.status == DebateStatus.WAITING,
+            DebateRoom.is_private.is_(False)
+        ).order_by(desc(DebateRoom.created_at))
+
+        if level != DebateLevel.ALL:
+            query = query.where(DebateRoom.level == level)
+        if category is not None:
+            query = query.where(DebateRoom.category == category)
+
+        result = await db.execute(query)
+        rooms = result.scalars().all()
+
+        for room in rooms:
+            if any(p.user_id == user_id for p in room.participants):
+                continue
+
+            role = self._choose_role_for_room(room)
+            if not role:
+                continue
+
+            try:
+                await self.join_debate_room(db, room.debate_room_id, user_id, role.value)
+            except ValueError:
+                continue
+
+            matched_room = await self.get_debate_room_details(db, room.debate_room_id)
+            return {
+                "room_id": matched_room.debate_room_id,
+                "room": matched_room,
+                "joined_role": role,
+                "matched_existing": True,
+                "queued": False
+            }
+
+        return None
+
+    async def _create_random_room(
+        self,
+        db: AsyncSession,
+        user_id: int,
+        level: DebateLevel,
+        category: DebateCategory | None,
+        max_users: int,
+        max_turns: int
+    ) -> dict:
+        role = choice([DebateRole.PRO, DebateRole.CON])
+        topic_meta = self._pick_local_topic(level, category)
+
+        topic_text = topic_meta.get("topic_text", "랜덤 토론 주제")
+        topic_context = topic_meta.get("one_line_context", "랜덤 매칭으로 생성된 토론입니다.")
+        title = topic_text[:100]
+
+        resolved_category = category or self._map_subject_to_category(topic_meta.get("subject"))
+        resolved_level = level if level != DebateLevel.ALL else self._map_dataset_level(topic_meta.get("level"))
+
+        debate_create = DebateRoomCreate(
+            title=title,
+            category=resolved_category,
+            topic=topic_text,
+            topic_description=topic_context,
+            level=resolved_level,
+            is_private=False,
+            room_password=None,
+            allow_observers=True,
+            max_users=max_users,
+            max_turns=max_turns,
+            creator_role=role
+        )
+
+        created_room = await self.create_debate_room(db, debate_create, user_id)
+
+        return {
+            "room_id": created_room.debate_room_id,
+            "room": created_room,
+            "joined_role": role,
+            "matched_existing": False,
+            "queued": True
+        }
+
+    def _choose_role_for_room(self, room: DebateRoom) -> DebateRole | None:
+        max_team_size = room.max_users // 2
+        pro_count = sum(1 for p in room.participants if p.role == DebateRole.PRO)
+        con_count = sum(1 for p in room.participants if p.role == DebateRole.CON)
+
+        available_roles = []
+        if pro_count < max_team_size:
+            available_roles.append(DebateRole.PRO)
+        if con_count < max_team_size:
+            available_roles.append(DebateRole.CON)
+
+        if not available_roles:
+            return None
+        if len(available_roles) == 1:
+            return available_roles[0]
+        if pro_count == con_count:
+            return choice(available_roles)
+        return DebateRole.PRO if pro_count < con_count else DebateRole.CON
+
+    def _pick_local_topic(self, level: DebateLevel, category: DebateCategory | None) -> dict:
+        docs = self._load_local_topics()
+        if not docs:
+            return {}
+
+        level_ko = self._map_level_to_dataset(level)
+        category_ko = self._map_category_to_dataset(category)
+
+        filtered = []
+        for doc in docs:
+            meta = doc.get("metadata", {})
+            if level_ko and meta.get("level") != level_ko:
+                continue
+            if category_ko and meta.get("subject") != category_ko:
+                continue
+            filtered.append(meta)
+
+        candidates = filtered or [doc.get("metadata", {}) for doc in docs]
+        return choice(candidates) if candidates else {}
+
+    def _load_local_topics(self) -> list:
+        csv_path = Path(__file__).resolve().parents[1] / "rag" / "data" / "topics.csv"
+        if not csv_path.exists():
+            return []
+        return load_topics_csv(str(csv_path))
+
+    def _map_level_to_dataset(self, level: DebateLevel) -> str | None:
+        mapping = {
+            DebateLevel.ELEMENTARY_LOW: "초등_저학년",
+            DebateLevel.ELEMENTARY_HIGH: "초등_고학년",
+            DebateLevel.MIDDLE: "중학생",
+            DebateLevel.HIGH: "고등학생",
+        }
+        if level == DebateLevel.ALL:
+            return None
+        return mapping.get(level)
+
+    def _map_category_to_dataset(self, category: DebateCategory | None) -> str | None:
+        mapping = {
+            DebateCategory.KOREAN: "국어",
+            DebateCategory.SOCIAL: "사회",
+            DebateCategory.MORAL: "도덕",
+            DebateCategory.ETHICS: "도덕",
+        }
+        if category is None:
+            return None
+        return mapping.get(category)
+
+    def _map_subject_to_category(self, subject: str | None) -> DebateCategory:
+        mapping = {
+            "국어": DebateCategory.KOREAN,
+            "사회": DebateCategory.SOCIAL,
+            "도덕": DebateCategory.MORAL,
+            "윤리": DebateCategory.ETHICS,
+        }
+        return mapping.get(subject, DebateCategory.KOREAN)
+
+    def _map_dataset_level(self, level: str | None) -> DebateLevel:
+        mapping = {
+            "초등_저학년": DebateLevel.ELEMENTARY_LOW,
+            "초등_고학년": DebateLevel.ELEMENTARY_HIGH,
+            "중학생": DebateLevel.MIDDLE,
+            "고등학생": DebateLevel.HIGH,
+        }
+        return mapping.get(level, DebateLevel.ALL)
     
     async def _add_badge(self, db: AsyncSession, user: User, badge_type: BadgeType):
         """유저에게 뱃지 추가 (중복 체크)"""

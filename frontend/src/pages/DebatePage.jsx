@@ -26,13 +26,21 @@ function DebatePage() {
     const [messageInput, setMessageInput] = useState("");
     const [messages, setMessages] = useState([]);
     const [debateStarted, setDebateStarted] = useState(false);
+    const [debateEnded, setDebateEnded] = useState(false);
+    const [turnRemaining, setTurnRemaining] = useState(null);
+    const [selectionRemaining, setSelectionRemaining] = useState(null);
+    const [hasRaised, setHasRaised] = useState(false);
     
     // 실시간 상태 관리 (라운드, 턴 정보)
     const [roundInfo, setRoundInfo] = useState({
         currentRound: 0,
         turnIndex: 0,
         turnTotal: 0,
-        nextSpeaker: null
+        nextSpeaker: null,
+        turnDeadline: null,
+        selectionActive: false,
+        selectionDeadline: null,
+        selectionRound: null
     });
 
     const socketRef = useRef(null);
@@ -53,6 +61,9 @@ function DebatePage() {
                     // 방 상태가 진행 중이면 debateStarted를 true로 설정하여 입력창 활성화
                     if (data.status !== "waiting") {
                         setDebateStarted(true);
+                    }
+                    if (data.status === "finished") {
+                        setDebateEnded(true);
                     }
                 } else {
                     setError("방 정보를 불러오지 못했습니다.");
@@ -101,7 +112,11 @@ function DebatePage() {
                 currentRound: data.current_round,
                 turnIndex: data.turn_index,
                 turnTotal: data.turn_total,
-                nextSpeaker: data.next_speaker
+                nextSpeaker: data.next_speaker,
+                turnDeadline: data.turn_deadline || null,
+                selectionActive: Boolean(data.selection_active),
+                selectionDeadline: data.selection_deadline || null,
+                selectionRound: data.selection_round ?? null
             });
 
             // 메시지 목록 업데이트
@@ -109,18 +124,56 @@ function DebatePage() {
                 const formatted = data.messages.map((m, idx) => ({
                     id: m.id || `${Date.now()}-${idx}`,
                     role: m.role,
-                    nickname: m.user_name || (m.role === 'ai' ? 'AI 사회자' : '시스템'),
+                    userId: m.user_id ?? null,
+                    turn: m.turn ?? null,
+                    nickname: m.user_name || (m.role === 'ai' ? 'AI ???' : '???'),
                     content: m.content,
-                    // ⭐ 백엔드에서 찢어서 보내주는 display_type을 그대로 받아서 사용
+                    // ? ????? ?? ???? display_type? ??? ??? ??
                     displayType: m.display_type || (m.role === 'ai' ? 'moderator' : (m.role === 'system' ? 'system' : 'user'))
                 }));
 
                 if (data.replace_messages) {
-                    setMessages(formatted);
+                    setMessages(formatted.filter((msg) => msg.displayType !== 'loading' && msg.displayType !== 'loading_end'));
                 } else {
-                    setMessages(prev => [...prev, ...formatted]);
+                    setMessages(prev => {
+                        let next = [...prev];
+                        formatted.forEach((msg) => {
+                            if (msg.displayType === 'loading_end') {
+                                next = next.filter((item) => item.displayType !== 'loading');
+                                return;
+                            }
+
+                            if (msg.displayType === 'loading') {
+                                next = next.filter((item) => item.displayType !== 'loading');
+                                next.push(msg);
+                                return;
+                            }
+
+                            next = next.filter((item) => item.displayType !== 'loading');
+
+                            if (msg.displayType !== 'draft' && msg.userId && msg.turn !== null) {
+                                next = next.filter((item) => !(
+                                    item.displayType === 'draft' &&
+                                    item.userId === msg.userId &&
+                                    item.turn === msg.turn
+                                ));
+                            }
+                            next.push(msg);
+                        });
+                        return next;
+                    });
                 }
             }
+        });
+
+
+        socket.on("participants_update", (data) => {
+            if (!data?.participants) return;
+            setRoom((prev) => (prev ? { ...prev, participants: data.participants } : prev));
+        });
+
+        socket.on("debate_ended", () => {
+            setDebateEnded(true);
         });
 
         socket.on("error", (err) => {
@@ -135,7 +188,83 @@ function DebatePage() {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
+    useEffect(() => {
+        if (debateEnded || !roundInfo.turnDeadline) {
+            setTurnRemaining(null);
+            return;
+        }
+
+        const deadline = new Date(roundInfo.turnDeadline);
+        if (Number.isNaN(deadline.getTime())) {
+            setTurnRemaining(null);
+            return;
+        }
+
+        const updateRemaining = () => {
+            const diffMs = deadline.getTime() - Date.now();
+            const seconds = Math.max(0, Math.ceil(diffMs / 1000));
+            setTurnRemaining(seconds);
+        };
+
+        updateRemaining();
+        const intervalId = setInterval(updateRemaining, 1000);
+        return () => clearInterval(intervalId);
+    }, [roundInfo.turnDeadline, debateEnded]);
+
+    useEffect(() => {
+        if (debateEnded || !roundInfo.selectionActive || !roundInfo.selectionDeadline) {
+            setSelectionRemaining(null);
+            return;
+        }
+
+        const deadline = new Date(roundInfo.selectionDeadline);
+        if (Number.isNaN(deadline.getTime())) {
+            setSelectionRemaining(null);
+            return;
+        }
+
+        const updateRemaining = () => {
+            const diffMs = deadline.getTime() - Date.now();
+            const seconds = Math.max(0, Math.ceil(diffMs / 1000));
+            setSelectionRemaining(seconds);
+        };
+
+        updateRemaining();
+        const intervalId = setInterval(updateRemaining, 1000);
+        return () => clearInterval(intervalId);
+    }, [roundInfo.selectionActive, roundInfo.selectionDeadline, debateEnded]);
+
+    useEffect(() => {
+        setHasRaised(false);
+    }, [roundInfo.selectionRound, roundInfo.selectionActive]);
+
     // 토론 시작 (방장용)
+    const handleEndDebate = () => {
+        if (!socketRef.current) return;
+        if (!window.confirm("토론을 종료하시겠습니까?")) return;
+        socketRef.current.emit("end_debate", {
+            room_id: roomId,
+            user_id: currentUser.user_id
+        });
+    };
+
+    const handleEndSpeaking = () => {
+        if (!socketRef.current) return;
+        socketRef.current.emit("end_speaking", {
+            room_id: roomId,
+            user_id: currentUser.user_id
+        });
+    };
+
+    const handleRaiseHand = () => {
+        if (!socketRef.current) return;
+        socketRef.current.emit("raise_hand", {
+            room_id: roomId,
+            user_id: currentUser.user_id
+        });
+        setHasRaised(true);
+    };
+
     const handleStartDebate = () => {
         socketRef.current?.emit("start_debate", {
             room_id: roomId,
@@ -152,15 +281,26 @@ function DebatePage() {
             room_id: roomId,
             user_id: currentUser.user_id,
             user_name: currentUser.nickname,
-            content: messageInput
+            content: messageInput.trim()
         });
 
         setMessageInput("");
     };
 
+    const formatRemaining = (seconds) => {
+        if (seconds === null || seconds === undefined) return "";
+        const safeSeconds = Math.max(0, seconds);
+        const minutes = Math.floor(safeSeconds / 60);
+        const rest = safeSeconds % 60;
+        return `${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
+    };
+
     // 내 차례인지 확인하는 로직 (input 비활성화 해제용)
+    const participants = room?.participants ?? [];
     const isMyTurn = roundInfo.nextSpeaker && String(roundInfo.nextSpeaker.user_id) === String(currentUser?.user_id);
     const isCreator = currentUser && parseInt(room?.creator_id) === parseInt(currentUser.user_id);
+    const myRole = participants.find((p) => String(p.user_id) === String(currentUser?.user_id))?.role;
+    const canRaiseHand = roundInfo.selectionActive && !debateEnded && myRole && myRole !== "observer";
 
     if (error) return <div className="debate-container center-msg">{error}</div>;
     if (!room) return <div className="debate-container center-msg">로딩 중...</div>;
@@ -169,15 +309,20 @@ function DebatePage() {
         <div className="debate-container">
             {/* 왼쪽 사이드바: 참가자 목록 */}
             <aside className="participants-sidebar">
-                <TeamSection title="찬성 TEAM" type="pro" members={room.participants.filter(p => p.role === "pro")} />
-                <TeamSection title="반대 TEAM" type="con" members={room.participants.filter(p => p.role === "con")} />
+                <TeamSection title="찬성 TEAM" type="pro" members={participants.filter((p) => p.role === "pro")} />
+                <TeamSection title="반대 TEAM" type="con" members={participants.filter((p) => p.role === "con")} />
             </aside>
 
             <main className="center-main-area">
                 <header className="debate-room-header">
                     <div className="header-top">
                         <h1 className="room-title">{room.title}</h1>
-                        {isCreator && !debateStarted && (
+                        {isCreator && debateStarted && !debateEnded && (
+                            <button className="end-debate-btn" onClick={handleEndDebate}>
+                                <RiCheckLine /> 토론 종료하기
+                            </button>
+                        )}
+                        {isCreator && !debateStarted && !debateEnded && (
                             <button className="start-debate-btn" onClick={handleStartDebate}>
                                 <RiPlayFill /> 토론 시작하기
                             </button>
@@ -195,11 +340,23 @@ function DebatePage() {
                     <div className="mod-content">
                         <span className="mod-label">AI 사회자</span>
                         <p className="mod-text">
-                            {!debateStarted ? "토론 시작을 기다리고 있습니다." : 
-                             `[라운드 ${roundInfo.currentRound}] ${roundInfo.nextSpeaker?.user_name || '진행'}님의 차례입니다.`}
+                            {debateEnded
+                                ? "??? ???????."
+                                : roundInfo.selectionActive
+                                    ? `?? ?? ? ? ??? ${roundInfo.selectionRound}`
+                                    : !debateStarted
+                                        ? "?? ??? ???? ?..."
+                                        : `[??? ${roundInfo.currentRound}] ${roundInfo.nextSpeaker?.user_name || '??'}? ?????.`}
                         </p>
                     </div>
-                    <div className="timer-badge"><RiTimerLine /> {roundInfo.turnIndex + 1}/{roundInfo.turnTotal || 0}</div>
+                    <div className="timer-badge">
+                        <RiTimerLine /> {roundInfo.turnIndex + 1}/{roundInfo.turnTotal || 0}
+                        {selectionRemaining !== null
+                            ? <span className="timer-remaining"> · 신청 {formatRemaining(selectionRemaining)}</span>
+                            : turnRemaining !== null
+                                ? <span className="timer-remaining"> · {formatRemaining(turnRemaining)}</span>
+                                : null}
+                    </div>
                 </div>
 
                 {/* 채팅창 */}
@@ -213,20 +370,40 @@ function DebatePage() {
                 {/* 입력창 - 내 차례가 아니면 비활성화 */}
                 <form className="input-area" onSubmit={handleSendMessage}>
                     <div className="turn-indicator">
-                        {isMyTurn ? <span className="my-turn"><RiUserVoiceLine /> 내 차례입니다!</span> : 
-                         debateStarted ? <span className="not-my-turn">상대방의 발언을 듣고 있습니다...</span> : null}
+                        {debateEnded ? <span className="not-my-turn">??? ???????.</span>
+                            : roundInfo.selectionActive ? <span className="not-my-turn">?? ?? ????.</span>
+                                : isMyTurn ? <span className="my-turn"><RiUserVoiceLine /> ? ?????</span>
+                                    : debateStarted ? <span className="not-my-turn">???? ??? ???? ????...</span> : null}
                     </div>
                     <div className="input-wrapper">
                         <input
                             type="text"
-                            placeholder={!debateStarted ? "토론 시작 대기 중..." : isMyTurn ? "메시지를 입력하세요..." : "지금은 발언권이 없습니다."}
+                            placeholder={debateEnded ? "토론이 종료되었습니다." : !debateStarted ? "토론이 준비중입니다..." : isMyTurn ? "나의 주장을 입력해주세요..." : "발언을 기다리고 있습니다."}
                             value={messageInput}
                             onChange={(e) => setMessageInput(e.target.value)}
-                            disabled={!debateStarted || !isMyTurn}
+                            disabled={!debateStarted || !isMyTurn || debateEnded}
                         />
-                        <button type="submit" className="send-btn" disabled={!messageInput.trim() || !isMyTurn}>
+                        <button type="submit" className="send-btn" disabled={!messageInput.trim() || !isMyTurn || debateEnded}>
                             <RiSendPlaneFill />
                         </button>
+                        <button
+                            type="button"
+                            className="end-turn-btn"
+                            onClick={handleEndSpeaking}
+                            disabled={!debateStarted || !isMyTurn || debateEnded}
+                        >
+                            <RiCheckLine /> 발언 종료
+                        </button>
+                        {roundInfo.selectionActive && canRaiseHand && (
+                            <button
+                                type="button"
+                                className="raise-hand-btn"
+                                onClick={handleRaiseHand}
+                                disabled={hasRaised}
+                            >
+                                <RiUserVoiceLine /> 발언 신청
+                            </button>
+                        )}
                     </div>
                 </form>
             </main>
@@ -264,6 +441,37 @@ function MessageRow({ msg, isMe }) {
     );
 
     // 일반 사회자 메시지
+    if (msg.displayType === 'draft') return (
+        <div className={`message-row ${msg.role} draft ${isMe ? 'me' : ''}`}>
+            {!isMe && (
+                <div className="msg-avatar">
+                    <img src={`https://api.dicebear.com/9.x/notionists/svg?seed=${msg.nickname}`} alt="p" />
+                </div>
+            )}
+            <div className="msg-content">
+                {!isMe && <span className="msg-name">{msg.nickname}</span>}
+                <div className={`msg-bubble ${msg.role} draft`}>
+                    <span className="draft-label">???</span>
+                    {msg.content}
+                </div>
+            </div>
+        </div>
+    );
+
+    if (msg.displayType === 'loading') return (
+        <div className="message-row moderator loading">
+            <div className="msg-avatar mod"><RiRobot2Line /></div>
+            <div className="msg-bubble mod loading">
+                {msg.content}
+                <span className="loading-dots" aria-hidden="true">
+                    <span>.</span>
+                    <span>.</span>
+                    <span>.</span>
+                </span>
+            </div>
+        </div>
+    );
+
     if (msg.displayType === 'moderator') return (
         <div className="message-row moderator">
             <div className="msg-avatar mod"><RiRobot2Line /></div>

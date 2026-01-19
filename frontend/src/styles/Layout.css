@@ -2,81 +2,82 @@
 .header {
     display: flex;
     align-items: center;
-    height: 60px;
+    height: 72px;
     background-color: var(--bg-color);
-    padding: 0 40px;
-    transition: all 0.3s ease;
+    padding: 0 32px;
+    transition: all 0.2s ease;
     justify-content: center;
     z-index: 100;
     position: relative;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .header.logged-in {
     height: auto;
-    background-color: #fff;
-    border-bottom: 1px solid #e5e7eb;
+    background-color: var(--surface-color);
+    border-bottom: 1px solid var(--border-color);
     justify-content: space-between;
-    padding: 20px 30px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    padding: 16px 24px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
 .header-left-profile {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 12px;
 }
 
 .profile-avatar {
-    width: 60px;
-    height: 60px;
+    width: 52px;
+    height: 52px;
     border-radius: 50%;
-    background-color: #f3f4f6;
+    background-color: #f1f5f9;
     display: flex;
     justify-content: center;
     align-items: center;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
 }
 
 .profile-info {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
 }
 
 .profile-name {
-    font-size: 30px;
+    font-size: 22px;
     font-weight: 800;
-    color: #1f2937;
+    color: var(--text-strong);
 }
 
 .level-bar-container {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 16px;
-    color: #9ca3af;
+    font-size: 13px;
+    color: var(--text-muted);
 }
 
 .level-divider {
-    width: 3px;
-    height: 16px;
-    background-color: #d1d5db;
+    width: 2px;
+    height: 14px;
+    background-color: #cbd5f5;
     margin-right: 2px;
 }
 
 .progress-track {
-    width: 350px;
-    height: 25px;
-    background-color: #f3f4f6;
-    border-radius: 8px;
+    width: 240px;
+    height: 16px;
+    background-color: #e2e8f0;
+    border-radius: 999px;
     overflow: hidden;
     position: relative;
 }
 
 .progress-fill {
     height: 100%;
-    background-color: #7bb6b3;
-    border-radius: 8px;
+    background-color: var(--point-sub-color);
+    border-radius: 999px;
     width: 0%;
 }
 
@@ -89,9 +90,9 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 700;
-    color: #555;
+    color: #0f172a;
     z-index: 2;
     line-height: 1;
 }
@@ -99,13 +100,13 @@
 .header-right-tools {
     display: flex;
     align-items: center;
-    gap: 30px;
+    gap: 16px;
 }
 
 .resource-display {
     display: flex;
-    gap: 20px;
-    background-color: #fff;
+    gap: 16px;
+    background-color: transparent;
 }
 
 .resource-item {
@@ -113,32 +114,38 @@
     align-items: center;
     gap: 6px;
     font-weight: 700;
-    font-size: 18px;
+    font-size: 16px;
+    color: var(--text-strong);
 }
 
 .icon-actions {
     display: flex;
-    gap: 12px;
+    gap: 10px;
 }
 
 .icon-btn {
-    width: 50px;
-    height: 50px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    border: 3px solid #f3f4f6;
-    background-color: white;
-    color: #6b7280;
+    border: 1px solid var(--border-color);
+    background-color: #fff;
+    color: var(--text-muted);
     cursor: pointer;
     display: flex;
     justify-content: center;
     align-items: center;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
 }
 
 .icon-btn:hover {
-    background-color: #f9fafb;
-    color: #111;
-    border-color: #e5e7eb;
+    background-color: #f8fafc;
+    color: var(--text-strong);
+    border-color: #cbd5f5;
+}
+
+.icon-btn:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.3);
+    outline-offset: 2px;
 }
 
 .header-logo-center {
@@ -146,18 +153,35 @@
     align-items: center;
 }
 
+@media (max-width: 1024px) {
+    .progress-track {
+        width: 180px;
+    }
+}
+
 @media (max-width: 768px) {
     .header {
-        padding: 0 20px;
+        padding: 0 16px;
+    }
+
+    .header.logged-in {
+        padding: 12px 16px;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .header-right-tools {
+        width: 100%;
+        justify-content: space-between;
     }
 }
 
 /* 푸터 */
 .footer {
-    background-color: #222;
-    color: #888;
-    padding: 60px 20px;
-    font-size: 14px;
+    background-color: #0f172a;
+    color: #94a3b8;
+    padding: 48px 20px;
+    font-size: 13px;
     margin-top: auto;
 }
 
@@ -175,7 +199,7 @@
 }
 
 .footer-links a {
-    color: #ccc;
+    color: #cbd5f5;
     transition: color 0.2s;
 }
 

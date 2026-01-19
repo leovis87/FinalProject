@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom"
-import { RiVipCrown2Fill } from "react-icons/ri";
+import { RiVipCrown2Fill, RiUserLine } from "react-icons/ri";
 import { MdLogout } from "react-icons/md";
 import Logo from "./Logo"
 import { useAuth } from "../contexts/AuthContext"
@@ -13,6 +13,10 @@ function Header() {
             logout();
             navigate("/");
         }
+    };
+
+    const handleGoMyPage = () => {
+        navigate("/mypage");
     };
 
     return (
@@ -50,6 +54,9 @@ function Header() {
                         </div>
 
                         <div className="icon-actions">
+                            <button className="icon-btn" onClick={handleGoMyPage}>
+                                <RiUserLine size={24} />
+                            </button>
                             <button className="icon-btn" onClick={handleLogout}><MdLogout size={25} /></button>
                         </div>
                     </div>

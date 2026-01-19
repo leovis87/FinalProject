@@ -697,7 +697,7 @@ def summary_node(state: DebateState,
                 pro_msgs.append(f"{msg.get('user_name')}: {msg.get('content')}")
 
             # 반대 측 발언 수집
-            elif msg.get('role') == 'cone':
+            elif msg.get('role') == 'con':
                 # "발언자: 내용" 형태로 저장하여 AI가 해당 발언자도 기억하게 추가 수정
                 con_msgs.append(f"{msg.get('user_name')}: {msg.get('content')}")
 
