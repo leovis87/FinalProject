@@ -113,6 +113,15 @@ class DebateMessageResponse(BaseModel):
     turn: Optional[int] = None
     created_at: datetime
 
+
+class DebateVerdictResponse(BaseModel):
+    debate_room_id: int
+    summary: Optional[str] = None
+    pro_eval: Optional[dict] = None
+    con_eval: Optional[dict] = None
+    best_player: Optional[str] = None
+    decided_at: Optional[datetime] = None
+
 class DebateResultItem(BaseModel):
     user_id: int
     result: DebateResult
