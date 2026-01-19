@@ -10,12 +10,23 @@ import {
     Tooltip
 } from "recharts";
 import "../styles/MyPage.css";
+import "../styles/Modal.css";
 
 function MyPage() {
     const { user } = useAuth();
     const [historyRecords, setHistoryRecords] = useState([]);
     const [historyStatus, setHistoryStatus] = useState("idle");
     const [historyError, setHistoryError] = useState("");
+    const [replayOpen, setReplayOpen] = useState(false);
+    const [replayStatus, setReplayStatus] = useState("idle");
+    const [replayError, setReplayError] = useState("");
+    const [replayMessages, setReplayMessages] = useState([]);
+    const [replayMeta, setReplayMeta] = useState(null);
+    const [verdictOpen, setVerdictOpen] = useState(false);
+    const [verdictStatus, setVerdictStatus] = useState("idle");
+    const [verdictError, setVerdictError] = useState("");
+    const [verdictData, setVerdictData] = useState(null);
+    const [verdictMeta, setVerdictMeta] = useState(null);
 
     const mockProfile = useMemo(() => ({
         nickname: user?.nickname || "Guest",
@@ -135,6 +146,87 @@ function MyPage() {
         { id: 4, name: "피드백 상위 10%", earned: false },
     ];
 
+    const handleOpenReplay = async (record) => {
+        const token = localStorage.getItem("access_token");
+        if (!token || !record?.id) {
+            setReplayError("리플레이를 불러올 수 없습니다.");
+            setReplayMessages([]);
+            setReplayStatus("error");
+            return;
+        }
+
+        setReplayOpen(true);
+        setReplayMeta(record);
+        setReplayStatus("loading");
+        setReplayError("");
+        setReplayMessages([]);
+
+        try {
+            const response = await fetch(`http://localhost:8000/api/debates/${record.id}/messages`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            if (!response.ok) {
+                throw new Error("리플레이 불러오기 실패");
+            }
+            const data = await response.json();
+            setReplayMessages(Array.isArray(data) ? data : []);
+            setReplayStatus("success");
+        } catch (error) {
+            setReplayStatus("error");
+            setReplayError(error?.message || "리플레이 불러오기 실패");
+        }
+    };
+
+    const handleCloseReplay = () => {
+        setReplayOpen(false);
+        setReplayMessages([]);
+        setReplayStatus("idle");
+        setReplayError("");
+        setReplayMeta(null);
+    };
+
+    const handleOpenVerdict = async (record) => {
+        const token = localStorage.getItem("access_token");
+        if (!token || !record?.id) {
+            setVerdictError("판결문을 불러올 수 없습니다.");
+            setVerdictStatus("error");
+            return;
+        }
+
+        setVerdictOpen(true);
+        setVerdictMeta(record);
+        setVerdictStatus("loading");
+        setVerdictError("");
+        setVerdictData(null);
+
+        try {
+            const response = await fetch(`http://localhost:8000/api/debates/${record.id}/verdict`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            if (!response.ok) {
+                throw new Error("판결문 불러오기 실패");
+            }
+            const data = await response.json();
+            setVerdictData(data);
+            setVerdictStatus("success");
+        } catch (error) {
+            setVerdictStatus("error");
+            setVerdictError(error?.message || "판결문 불러오기 실패");
+        }
+    };
+
+    const handleCloseVerdict = () => {
+        setVerdictOpen(false);
+        setVerdictStatus("idle");
+        setVerdictError("");
+        setVerdictData(null);
+        setVerdictMeta(null);
+    };
+
     return (
         <MyPageLayout>
             <StatsOverview stats={stats} />
@@ -144,9 +236,29 @@ function MyPage() {
                 historyRecords={historyRecords}
                 historyStatus={historyStatus}
                 historyError={historyError}
+                onReplay={handleOpenReplay}
+                onVerdict={handleOpenVerdict}
                 badges={badges}
                 nickname={mockProfile.nickname}
             />
+            {replayOpen && (
+                <ReplayModal
+                    record={replayMeta}
+                    status={replayStatus}
+                    error={replayError}
+                    messages={replayMessages}
+                    onClose={handleCloseReplay}
+                />
+            )}
+            {verdictOpen && (
+                <VerdictModal
+                    record={verdictMeta}
+                    status={verdictStatus}
+                    error={verdictError}
+                    verdict={verdictData}
+                    onClose={handleCloseVerdict}
+                />
+            )}
         </MyPageLayout>
     );
 }
@@ -203,7 +315,7 @@ function StatsOverview({ stats }) {
     );
 }
 
-function ActivityTabs({ activityData, recentDebates, historyRecords, historyStatus, historyError, badges, nickname }) {
+function ActivityTabs({ activityData, recentDebates, historyRecords, historyStatus, historyError, onReplay, onVerdict, badges, nickname }) {
     const [activeTab, setActiveTab] = useState("summary");
 
     return (
@@ -244,7 +356,13 @@ function ActivityTabs({ activityData, recentDebates, historyRecords, historyStat
                     <ActivitySummaryTab activityData={activityData} recentDebates={recentDebates} />
                 )}
                 {activeTab === "history" && (
-                    <HistoryTab historyRecords={historyRecords} historyStatus={historyStatus} historyError={historyError} />
+                    <HistoryTab
+                        historyRecords={historyRecords}
+                        historyStatus={historyStatus}
+                        historyError={historyError}
+                        onReplay={onReplay}
+                        onVerdict={onVerdict}
+                    />
                 )}
                 {activeTab === "badges" && <BadgesTab badges={badges} />}
                 {activeTab === "settings" && <SettingsTab nickname={nickname} />}
@@ -313,7 +431,7 @@ function ActivitySummaryTab({ activityData, recentDebates }) {
     );
 }
 
-function HistoryTab({ historyRecords, historyStatus, historyError }) {
+function HistoryTab({ historyRecords, historyStatus, historyError, onReplay, onVerdict }) {
     return (
         <div className="history-tab">
             <div className="history-filters">
@@ -350,15 +468,123 @@ function HistoryTab({ historyRecords, historyStatus, historyError }) {
                         <span className="history-meta">{record.role}</span>
                         <span className="history-meta">{record.result}</span>
                         <div className="history-actions">
-                            <button type="button" className="mypage-action-btn secondary small">
+                            <button
+                                type="button"
+                                className="mypage-action-btn secondary small"
+                                onClick={() => onVerdict?.(record)}
+                            >
                                 판결문
                             </button>
-                            <button type="button" className="mypage-action-btn ghost small">
+                            <button
+                                type="button"
+                                className="mypage-action-btn ghost small"
+                                onClick={() => onReplay?.(record)}
+                            >
                                 리플레이
                             </button>
                         </div>
                     </div>
                 ))}
+            </div>
+        </div>
+    );
+}
+
+function ReplayModal({ record, status, error, messages, onClose }) {
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content replay-modal" onClick={(event) => event.stopPropagation()}>
+                <button type="button" className="modal-close-btn" onClick={onClose} aria-label="닫기">
+                    ×
+                </button>
+                <div className="replay-header">
+                    <h2 className="replay-title">토론 리플레이</h2>
+                    <div className="replay-meta">
+                        <span>{record?.title || "토론 제목 없음"}</span>
+                        <span>{record?.date || "-"}</span>
+                        <span>{record?.role || "-"}</span>
+                        <span>{record?.result || "-"}</span>
+                    </div>
+                </div>
+                <div className="replay-body">
+                    {status === "loading" && <div className="replay-status">리플레이를 불러오는 중...</div>}
+                    {status === "error" && <div className="replay-status error">{error || "불러오지 못했습니다."}</div>}
+                    {status === "success" && messages.length === 0 && (
+                        <div className="replay-status">표시할 메시지가 없습니다.</div>
+                    )}
+                    {status === "success" && messages.length > 0 && (
+                        <div className="replay-list">
+                            {messages.map((msg) => (
+                                <div key={msg.message_id} className={`replay-message ${msg.role}`}>
+                                    <div className="replay-message-head">
+                                        <span className="replay-role">{msg.user_name || msg.role}</span>
+                                        <span className="replay-time">
+                                            {msg.turn ? `Turn ${msg.turn}` : "-"}
+                                        </span>
+                                    </div>
+                                    <div className="replay-content">{msg.content}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function VerdictModal({ record, status, error, verdict, onClose }) {
+    const proEval = verdict?.pro_eval || null;
+    const conEval = verdict?.con_eval || null;
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content verdict-modal" onClick={(event) => event.stopPropagation()}>
+                <button type="button" className="modal-close-btn" onClick={onClose} aria-label="닫기">
+                    ×
+                </button>
+                <div className="verdict-header">
+                    <h2 className="verdict-title">판결문</h2>
+                    <div className="verdict-meta">
+                        <span>{record?.title || "토론 제목 없음"}</span>
+                        <span>{record?.date || "-"}</span>
+                        <span>{record?.result || "-"}</span>
+                    </div>
+                </div>
+                <div className="verdict-body">
+                    {status === "loading" && <div className="verdict-status">판결문을 불러오는 중...</div>}
+                    {status === "error" && <div className="verdict-status error">{error || "불러오지 못했습니다."}</div>}
+                    {status === "success" && !verdict && (
+                        <div className="verdict-status">판결문 데이터가 없습니다.</div>
+                    )}
+                    {status === "success" && verdict && (
+                        <div className="verdict-content">
+                            {verdict.summary && (
+                                <div className="verdict-section">
+                                    <h3>전체 총평</h3>
+                                    <p>{verdict.summary}</p>
+                                </div>
+                            )}
+                            <div className="verdict-scores">
+                                <div className="verdict-card pro">
+                                    <h4>찬성 팀</h4>
+                                    <strong>{proEval?.total_score ?? "-"}점</strong>
+                                    {proEval?.feedback_text && <p>{proEval.feedback_text}</p>}
+                                </div>
+                                <div className="verdict-card con">
+                                    <h4>반대 팀</h4>
+                                    <strong>{conEval?.total_score ?? "-"}점</strong>
+                                    {conEval?.feedback_text && <p>{conEval.feedback_text}</p>}
+                                </div>
+                            </div>
+                            {verdict.best_player && (
+                                <div className="verdict-section highlight">
+                                    MVP: <strong>{verdict.best_player}</strong>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

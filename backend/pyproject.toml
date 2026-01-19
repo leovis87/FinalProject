@@ -31,4 +31,5 @@ dependencies = [
     "langchain-openai>=0.1.0",
     "langchain-tavily>=0.2.16",
     "python-socketio>=5.16.0",
+    "greenlet>=3.3.0",
 ]

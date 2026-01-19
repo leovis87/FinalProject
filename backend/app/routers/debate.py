@@ -12,6 +12,8 @@ from schemas.debate import (
     RandomMatchRequest,
     RandomMatchResponse,
     DebateHistoryItem,
+    DebateMessageResponse,
+    DebateVerdictResponse,
     DebateResultUpsertRequest,
     DebateResultUpsertResponse
 )
@@ -59,6 +61,32 @@ async def get_debate_history(
     current_user: User = Depends(get_current_user)
 ):
     return await debate_service.get_debate_history(db, current_user.user_id)
+
+@router.get("/{debate_id}/messages", response_model=List[DebateMessageResponse])
+async def get_debate_messages(
+    debate_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        return await debate_service.get_debate_messages(db, debate_id, current_user.user_id)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.get("/{debate_id}/verdict", response_model=DebateVerdictResponse)
+async def get_debate_verdict(
+    debate_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        return await debate_service.get_debate_verdict(db, debate_id, current_user.user_id)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 @router.get("/{debate_id}", response_model=DebateRoomResponse)
 async def get_debate_room(

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { io } from "socket.io-client";
 import { 
@@ -13,12 +13,14 @@ import {
     RiBarChartFill,
     RiFileTextLine,
     RiCheckLine,
-    RiInformationLine
+    RiInformationLine,
+    RiLogoutBoxLine
 } from "react-icons/ri";
 import "../styles/DebatePage.css";
 
 function DebatePage() {
     const { roomId } = useParams();
+    const navigate = useNavigate();
     const { user: currentUser } = useAuth();
     
     const [room, setRoom] = useState(null);
@@ -126,9 +128,9 @@ function DebatePage() {
                     role: m.role,
                     userId: m.user_id ?? null,
                     turn: m.turn ?? null,
-                    nickname: m.user_name || (m.role === 'ai' ? 'AI ???' : '???'),
+                    nickname: m.user_name || (m.role === 'ai' ? 'AI 사회자' : '알 수 없음'),
                     content: m.content,
-                    // ? ????? ?? ???? display_type? ??? ??? ??
+                    // 서버에서 display_type이 없으면 role 기준으로 기본값 설정
                     displayType: m.display_type || (m.role === 'ai' ? 'moderator' : (m.role === 'system' ? 'system' : 'user'))
                 }));
 
@@ -302,6 +304,17 @@ function DebatePage() {
     const myRole = participants.find((p) => String(p.user_id) === String(currentUser?.user_id))?.role;
     const canRaiseHand = roundInfo.selectionActive && !debateEnded && myRole && myRole !== "observer";
 
+    const handleLeaveDebate = () => {
+        if (socketRef.current) {
+            socketRef.current.emit("leave_debate", {
+                room_id: roomId,
+                user_id: currentUser?.user_id,
+            });
+            socketRef.current.disconnect();
+        }
+        navigate("/");
+    };
+
     if (error) return <div className="debate-container center-msg">{error}</div>;
     if (!room) return <div className="debate-container center-msg">로딩 중...</div>;
 
@@ -317,16 +330,21 @@ function DebatePage() {
                 <header className="debate-room-header">
                     <div className="header-top">
                         <h1 className="room-title">{room.title}</h1>
-                        {isCreator && debateStarted && !debateEnded && (
-                            <button className="end-debate-btn" onClick={handleEndDebate}>
-                                <RiCheckLine /> 토론 종료하기
+                        <div className="header-actions">
+                            {isCreator && debateStarted && !debateEnded && (
+                                <button className="end-debate-btn" onClick={handleEndDebate}>
+                                    <RiCheckLine /> 토론 종료하기
+                                </button>
+                            )}
+                            {isCreator && !debateStarted && !debateEnded && (
+                                <button className="start-debate-btn" onClick={handleStartDebate}>
+                                    <RiPlayFill /> 토론 시작하기
+                                </button>
+                            )}
+                            <button className="leave-debate-btn" onClick={handleLeaveDebate}>
+                                <RiLogoutBoxLine /> 토론 나가기
                             </button>
-                        )}
-                        {isCreator && !debateStarted && !debateEnded && (
-                            <button className="start-debate-btn" onClick={handleStartDebate}>
-                                <RiPlayFill /> 토론 시작하기
-                            </button>
-                        )}
+                        </div>
                     </div>
                     <div className="topic-box">
                         <span className={`category-badge ${room.category}`}>{room.category}</span>
@@ -341,12 +359,12 @@ function DebatePage() {
                         <span className="mod-label">AI 사회자</span>
                         <p className="mod-text">
                             {debateEnded
-                                ? "??? ???????."
+                                ? "토론이 종료되었습니다."
                                 : roundInfo.selectionActive
-                                    ? `?? ?? ? ? ??? ${roundInfo.selectionRound}`
+                                    ? `발언 신청 라운드 ${roundInfo.selectionRound}`
                                     : !debateStarted
-                                        ? "?? ??? ???? ?..."
-                                        : `[??? ${roundInfo.currentRound}] ${roundInfo.nextSpeaker?.user_name || '??'}? ?????.`}
+                                        ? "토론을 준비 중입니다..."
+                                        : `[라운드 ${roundInfo.currentRound}] ${roundInfo.nextSpeaker?.user_name || '다음 참가자'}님 발언 차례입니다.`}
                         </p>
                     </div>
                     <div className="timer-badge">
@@ -370,10 +388,10 @@ function DebatePage() {
                 {/* 입력창 - 내 차례가 아니면 비활성화 */}
                 <form className="input-area" onSubmit={handleSendMessage}>
                     <div className="turn-indicator">
-                        {debateEnded ? <span className="not-my-turn">??? ???????.</span>
-                            : roundInfo.selectionActive ? <span className="not-my-turn">?? ?? ????.</span>
-                                : isMyTurn ? <span className="my-turn"><RiUserVoiceLine /> ? ?????</span>
-                                    : debateStarted ? <span className="not-my-turn">???? ??? ???? ????...</span> : null}
+                        {debateEnded ? <span className="not-my-turn">토론이 종료되었습니다.</span>
+                            : roundInfo.selectionActive ? <span className="not-my-turn">발언 신청 중입니다.</span>
+                                : isMyTurn ? <span className="my-turn"><RiUserVoiceLine /> 내 차례입니다</span>
+                                    : debateStarted ? <span className="not-my-turn">다음 차례를 기다리고 있습니다...</span> : null}
                     </div>
                     <div className="input-wrapper">
                         <input
@@ -451,7 +469,7 @@ function MessageRow({ msg, isMe }) {
             <div className="msg-content">
                 {!isMe && <span className="msg-name">{msg.nickname}</span>}
                 <div className={`msg-bubble ${msg.role} draft`}>
-                    <span className="draft-label">???</span>
+                    <span className="draft-label">초안</span>
                     {msg.content}
                 </div>
             </div>

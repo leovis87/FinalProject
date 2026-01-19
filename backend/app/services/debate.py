@@ -4,9 +4,11 @@ from sqlalchemy.orm import selectinload
 from datetime import datetime
 from pathlib import Path
 from random import choice
+import json
 
 from models.debate_room import DebateRoom
 from models.debate_participant import DebateParticipant
+from models.debate_message import DebateMessage
 from models.user import User
 from models.enums import DebateStatus, BadgeType, DebateRole, DebateLevel, DebateCategory
 from schemas.debate import DebateRoomCreate, DebateResultUpsertRequest
@@ -155,6 +157,95 @@ class DebateService:
             })
 
         return items
+
+    async def get_debate_messages(self, db: AsyncSession, debate_id: int, user_id: int) -> list[dict]:
+        room = await db.get(DebateRoom, debate_id)
+        if not room:
+            raise ValueError("Debate room not found.")
+
+        participant_query = select(DebateParticipant).where(
+            DebateParticipant.debate_room_id == debate_id,
+            DebateParticipant.user_id == user_id
+        )
+        participant_result = await db.execute(participant_query)
+        if participant_result.scalar_one_or_none() is None:
+            raise PermissionError("You are not a participant.")
+
+        query = select(DebateMessage).options(
+            selectinload(DebateMessage.user)
+        ).where(
+            DebateMessage.debate_room_id == debate_id
+        ).order_by(DebateMessage.created_at.asc(), DebateMessage.message_id.asc())
+
+        result = await db.execute(query)
+        messages = result.scalars().all()
+
+        items = []
+        for msg in messages:
+            items.append({
+                "message_id": msg.message_id,
+                "debate_room_id": msg.debate_room_id,
+                "user_id": msg.user_id,
+                "user_name": msg.user.nickname if msg.user else None,
+                "role": msg.role,
+                "display_type": msg.display_type,
+                "content": msg.content,
+                "turn": msg.turn,
+                "created_at": msg.created_at,
+            })
+
+        return items
+
+    async def get_debate_verdict(self, db: AsyncSession, debate_id: int, user_id: int) -> dict:
+        room = await db.get(DebateRoom, debate_id)
+        if not room:
+            raise ValueError("Debate room not found.")
+
+        participant_query = select(DebateParticipant).where(
+            DebateParticipant.debate_room_id == debate_id,
+            DebateParticipant.user_id == user_id
+        )
+        participant_result = await db.execute(participant_query)
+        if participant_result.scalar_one_or_none() is None:
+            raise PermissionError("You are not a participant.")
+
+        query = select(DebateMessage).where(
+            DebateMessage.debate_room_id == debate_id,
+            DebateMessage.display_type.in_(["report_summary", "report_pro", "report_con", "report_mvp"])
+        ).order_by(DebateMessage.created_at.asc(), DebateMessage.message_id.asc())
+
+        result = await db.execute(query)
+        messages = result.scalars().all()
+
+        summary = None
+        pro_eval = None
+        con_eval = None
+        best_player = None
+
+        for msg in messages:
+            if msg.display_type == "report_summary":
+                summary = msg.content
+            elif msg.display_type == "report_pro":
+                try:
+                    pro_eval = json.loads(msg.content)
+                except Exception:
+                    pro_eval = None
+            elif msg.display_type == "report_con":
+                try:
+                    con_eval = json.loads(msg.content)
+                except Exception:
+                    con_eval = None
+            elif msg.display_type == "report_mvp":
+                best_player = msg.content
+
+        return {
+            "debate_room_id": debate_id,
+            "summary": summary,
+            "pro_eval": pro_eval,
+            "con_eval": con_eval,
+            "best_player": best_player,
+            "decided_at": room.finished_at,
+        }
 
     async def set_debate_results(
         self,
