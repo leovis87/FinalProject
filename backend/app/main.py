@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.lifespan import lifespan
 from routers import user, debate, rag
+from core.socket_io import sio_app
 
 app = FastAPI(lifespan=lifespan)
 
@@ -28,3 +29,5 @@ if __name__ == "__main__":
                 host="localhost",
                 port=8000,
                 reload=True)
+
+app.mount("/socket.io", sio_app)

@@ -44,3 +44,12 @@ class BadgeType(str, enum.Enum):
     PASSIONATE = "열혈 토론가"
     POPULAR = "인기 토론가"
     KING = "토론왕"
+
+class DebateStatus(str, enum.Enum):
+    WAITING = "waiting"              # 대기 중
+    PROCEEDING = "proceeding"        # 진행 중 (추가됨)
+    IN_PROGRESS_INTRO = "intro"      # 입론
+    IN_PROGRESS_REBUTTAL = "rebuttal" # 반론
+    IN_PROGRESS_REREBUTTAL = "rerebuttal" # 재반론
+    IN_PROGRESS_CONCLUSION = "conclusion" # 결론
+    FINISHED = "finished"            # 종료

@@ -18,18 +18,18 @@ import logging
 from dotenv import load_dotenv
 from datetime import datetime
 from typing import (Literal)
-from schemas import (
+from .schemas import (
     DebateState,
     TopicBriefing, RefereeDecision,
     ModeratorReport, PersonalCoachingReport
 )
-from config import (GEMINI_MODELS,
+from .config import (GEMINI_MODELS,
                     TEMPERATURE, MAX_TOKENS,
                     TAVILY_SEARCH,
-                    llm_c_configured,
                     llm_g_real_non_harm,
                     get_search_tool,
                     create_run_config)
+from core.config import settings 
 
 # LangChain Core
 from langchain_core.messages import HumanMessage, AIMessage # 수동 기억장치 (history)
@@ -928,7 +928,7 @@ def moderator_shared_node(state: DebateState,
     #   -> 정리만 함. 가벼운 flash 모델로.
     moderator_structuring_llm = ChatGoogleGenerativeAI(
         model = GEMINI_MODELS['flash'],
-        google_api_key = os.environ["GOOGLE_API_KEY"],
+        google_api_key = settings.GEMINI_API_KEY,
         temperature = 0.0,
         max_output_tokens = 8192,           # 토큰 확보
         safety_settings = safety_settings,  # 직접 주입

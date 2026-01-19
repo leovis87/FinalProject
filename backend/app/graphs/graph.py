@@ -24,12 +24,12 @@ from langgraph.checkpoint.memory import MemorySaver # LangGraph용 Memory -> 자
 from langgraph.checkpoint.postgres import PostgresSaver # PostgreSQL용 Memory -> 자동 기억장치 (서버)
 
 # State, Pydantic
-from schemas import (
+from .schemas import (
     DebateState
 )
 
 # Node, Func
-from nodes import (
+from .nodes import (
     analyze_topic_node, # Topic 설명 + 입론 2가지 추천
     pro_turn_node_user, pro_turn_node_ai, # 찬성측
     con_turn_node_user, con_turn_node_ai, # 반대측
@@ -43,7 +43,7 @@ from nodes import (
 )
 
 # 🛠️ Test 단계에서만 활용. 추후 삭제 예정
-from config import GEMINI_MODELS
+from .config import GEMINI_MODELS
 
 load_dotenv()
 
