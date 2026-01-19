@@ -687,23 +687,13 @@ def summary_node(state: DebateState,
     # 1. Prompt용 변수 설정
     messages = state.get('messages', [])
 
-    # 2. Error 방지용 초기화
-    last_pro_msg = "발언 없음"
-    last_con_msg = "발언 없음"
+    # 2. 현재 턴 메시지만 집계해서 라운드별 요약을 만든다.
+    turn_messages = [msg for msg in messages if msg.get('turn') == current_turn]
+    pro_messages = [msg.get('content', '') for msg in turn_messages if msg.get('role') == 'pro']
+    con_messages = [msg.get('content', '') for msg in turn_messages if msg.get('role') == 'con']
 
-    # 3. 역순으로 탐색 (최신 메시지 -> 처음 메시지)
-    for msg in reversed(messages):
-        # (1) 찬성 측 최신 발언 찾기 (아직 못 찾았을 때만)
-        if last_pro_msg == "발언 없음" and msg.get('role') == 'pro':
-            last_pro_msg = msg.get('content')
-
-        # (2) 반대 측 최신 발언 찾기 (아직 못 찾았을 때만)
-        if last_con_msg == "발언 없음" and msg.get('role') == 'con':
-            last_con_msg = msg.get('content')
-
-        # (3) 둘다 찾으면 더 이상 과거를 찾을 필요가 없어짐 == 종료
-        if last_pro_msg != "발언 없음" and last_con_msg != "발언 없음":
-            break
+    pro_text = "\n".join(f"- {content}" for content in pro_messages) if pro_messages else "발언 없음"
+    con_text = "\n".join(f"- {content}" for content in con_messages) if con_messages else "발언 없음"
 
     # ============================================
     # 🏗️ Prompt 구성 (압축 요약 유도)
@@ -713,7 +703,7 @@ def summary_node(state: DebateState,
 너는 토론 기록관이야.
 
 [Task]
-이번 턴에서 오간 '찬성'과 '반대' 측의 주장을 분석해서, 각각 **핵심 논거 한 문장**으로 요약해.
+이번 턴에서 오간 '찬성'과 '반대' 측 발언 전체를 분석해서, 각각 **핵심 논거 한 문장**으로 요약해.
 장황한 설명은 빼고, 논리적인 뼈대만 남겨.
 
 [Output Format]
@@ -724,8 +714,11 @@ def summary_node(state: DebateState,
 
     user_prompt = f"""
 [Turn {current_turn} Data]
-- 찬성 팀 발언: {last_pro_msg}
-- 반대 팀 발언: {last_con_msg}
+- 찬성 팀 발언 목록:
+{pro_text}
+
+- 반대 팀 발언 목록:
+{con_text}
 
 위 내용을 포맷에 맞춰 요약해줘.
 """

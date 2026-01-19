@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Asta+Sans:wght@300..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300..800&display=swap');
 
 :root {
     /* 컬러 팔레트 */
@@ -12,6 +12,18 @@
     --medium-size: 16px;
 }
 
+:root {
+    --bg-color: #f5f7fb;
+    --surface-color: #ffffff;
+    --point-main-color: #2563eb;
+    --point-sub-color: #14b8a6;
+    --text-strong: #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+    --shadow-soft: 0 18px 48px rgba(15, 23, 42, 0.08);
+    --shadow-card: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -19,9 +31,13 @@
 }
 
 body {
-    font-family: "Asta Sans", sans-serif;
+    font-family: "Manrope", sans-serif;
     font-weight: 500;
     background-color: var(--bg-color);
+    color: var(--text-strong);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
 }
 
 a {
@@ -33,7 +49,7 @@ a {
     font-weight: 700;
     font-size: var(--logo-size);
     letter-spacing: -0.5px;
-    background: linear-gradient(90deg, #1E3A8A 0%, #7680DA 50%, #9FA6FF 100%);
+    background: linear-gradient(90deg, #2563eb 0%, #0ea5e9 50%, #14b8a6 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;

@@ -62,3 +62,28 @@ class DebateRoomResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+class RandomMatchRequest(BaseModel):
+    level: DebateLevel = Field(DebateLevel.ALL, description="학년/난이도")
+    category: DebateCategory | None = Field(None, description="과목 카테고리")
+    max_users: int = Field(4, ge=2, le=6, description="최대 참여 인원")
+    max_turns: int = Field(4, ge=4, le=20, description="총 라운드 수")
+
+    @field_validator("category", mode="before")
+    def normalize_category(cls, value):
+        if value in (None, "", "all"):
+            return None
+        return value
+
+    @field_validator("level", mode="before")
+    def normalize_level(cls, value):
+        if value in (None, "", "all"):
+            return DebateLevel.ALL
+        return value
+
+class RandomMatchResponse(BaseModel):
+    room_id: int
+    room: DebateRoomResponse
+    joined_role: DebateRole
+    matched_existing: bool
+    queued: bool
