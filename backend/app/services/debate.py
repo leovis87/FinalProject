@@ -10,11 +10,32 @@ from models.debate_room import DebateRoom
 from models.debate_participant import DebateParticipant
 from models.debate_message import DebateMessage
 from models.user import User
-from models.enums import DebateStatus, BadgeType, DebateRole, DebateLevel, DebateCategory
+from models.enums import DebateStatus, BadgeType, DebateRole, DebateLevel, DebateCategory, DebateResult
 from schemas.debate import DebateRoomCreate, DebateResultUpsertRequest
 from rag.indexer import load_topics_csv
 
 class DebateService:
+    def _required_xp(self, level: int) -> int:
+        step = max(0, level - 1)
+        return 100 + 20 * step + 5 * (step ** 2)
+
+    def _apply_xp(self, user: User, gain: int) -> None:
+        if gain <= 0:
+            return
+        user.exp = max(0, user.exp) + gain
+        while user.exp >= self._required_xp(user.level):
+            user.exp -= self._required_xp(user.level)
+            user.level += 1
+
+    def _calculate_xp_gain(self, result: DebateResult) -> int:
+        base = 10
+        result_bonus = {
+            DebateResult.WIN: 25,
+            DebateResult.DRAW: 18,
+            DebateResult.LOSE: 12,
+        }
+        return base + result_bonus.get(result, 0)
+
     async def create_debate_room(self, db: AsyncSession, debate_create: DebateRoomCreate, creator_id: int) -> DebateRoom:
         """토론방 생성 및 개설자 참가 처리"""
         debate_data = debate_create.model_dump()
@@ -257,7 +278,7 @@ class DebateService:
     ) -> dict:
         """Set final results for a debate room."""
         query = select(DebateRoom).options(
-            selectinload(DebateRoom.participants)
+            selectinload(DebateRoom.participants).selectinload(DebateParticipant.user)
         ).where(DebateRoom.debate_room_id == debate_id)
         result = await db.execute(query)
         room = result.scalar_one_or_none()
@@ -282,11 +303,18 @@ class DebateService:
             participant = participants.get(item.user_id)
             if not participant:
                 continue
+            already_decided = participant.result_decided_at is not None
             participant.result = item.result
             participant.result_reason = payload.result_reason
             participant.result_decided_at = decided_at
             participant.result_decided_by = payload.decided_by
             db.add(participant)
+
+            user = participant.user
+            if user and not already_decided:
+                gain = self._calculate_xp_gain(item.result)
+                self._apply_xp(user, gain)
+                db.add(user)
 
         room.status = DebateStatus.FINISHED
         if room.finished_at is None:

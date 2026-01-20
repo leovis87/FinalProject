@@ -732,10 +732,12 @@ async def _emit_loading_end(room_state: dict) -> None:
     )
 
 
-def _run_topic_summary(room_state: dict) -> Optional[dict]:
+async def _run_topic_summary(room_state: dict) -> Optional[dict]:
     state = _graph_base_state(room_state)
     config = _graph_config(f"debate_{room_state['room_id']}_topic")
-    result = debate_app.invoke(Command(update=state, goto="analyze_topic"), config)
+    loop = asyncio.get_running_loop()
+    command = Command(update=state, goto="analyze_topic")
+    result = await loop.run_in_executor(None, debate_app.invoke, command, config)
     return result.get("topic_analysis") if isinstance(result, dict) else None
 
 
@@ -1205,7 +1207,10 @@ async def handle_start(sid, data):
                     graph_payload = _debug_payload("info", "GRAPH", room_id_str, str(user_id), "topic_summary start")
                     _debug_print(graph_payload, state=str(room.status))
                     await _emit_debug(graph_payload, room_id_str, sid=sid)
-                    topic_analysis = _run_topic_summary(room_state)
+                    try:
+                        topic_analysis = await asyncio.wait_for(_run_topic_summary(room_state), timeout=15)
+                    except asyncio.TimeoutError:
+                        topic_analysis = None
                     room_state["topic_analysis"] = topic_analysis
                     parts = _format_topic_analysis_parts(topic_analysis)
                     if not parts:

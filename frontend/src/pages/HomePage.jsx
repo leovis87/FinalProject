@@ -205,6 +205,114 @@ function HomePage() {
                             토론방 만들기
                         </button>
                     </section>
+
+                    <section className="card info-card">
+                        <div className="tab-header">
+                            <button
+                                type="button"
+                                className={`tab-btn ${infoTab === "notice" ? "active" : ""}`}
+                                onClick={() => setInfoTab("notice")}
+                            >
+                                공지사항
+                            </button>
+                            <button
+                                type="button"
+                                className={`tab-btn ${infoTab === "tips" ? "active" : ""}`}
+                                onClick={() => setInfoTab("tips")}
+                            >
+                                오늘의 토론 팁
+                            </button>
+                            <button
+                                type="button"
+                                className={`tab-btn ${infoTab === "verdicts" ? "active" : ""}`}
+                                onClick={() => setInfoTab("verdicts")}
+                            >
+                                인기 판결문
+                            </button>
+                        </div>
+
+                        <div className="tab-content">
+                            {infoTab === "notice" && (
+                                <>
+                                    <div className="card-title-row split">
+                                        <h3>공지사항</h3>
+                                        <button type="button" className="text-link">
+                                            자세히 보기
+                                        </button>
+                                    </div>
+                                    <div className="notice-item">
+                                        <strong className="notice-title">랜덤 매칭 오픈 안내</strong>
+                                        <p className="notice-desc">간단한 매칭으로 빠르게 토론에 참여해보세요.</p>
+                                    </div>
+                                    <div className="notice-item">
+                                        <strong className="notice-title">신규 토론 룰북 업데이트</strong>
+                                        <p className="notice-desc">발언 시간과 판정 기준을 확인해 주세요.</p>
+                                    </div>
+                                </>
+                            )}
+
+                            {infoTab === "tips" && (
+                                <>
+                                    <div className="card-title-row">
+                                        <h3>오늘의 토론 팁</h3>
+                                    </div>
+                                    <ul className="tip-list">
+                                        <li>주장은 한 문장으로 요약하고 근거를 붙이세요.</li>
+                                        <li>상대 주장의 핵심을 먼저 요약하면 설득력이 높아집니다.</li>
+                                        <li>사례나 통계로 주장 신뢰도를 높이세요.</li>
+                                    </ul>
+                                </>
+                            )}
+
+                            {infoTab === "verdicts" && (
+                                <>
+                                    <div className="card-title-row split">
+                                        <h3>인기 판결문</h3>
+                                        <button
+                                            type="button"
+                                            className="text-link"
+                                            onClick={() => togglePanel("verdicts")}
+                                        >
+                                            더보기
+                                        </button>
+                                    </div>
+                                    {isLoadingVerdicts && (
+                                        <div className="verdict-item">
+                                            <span>불러오는 중...</span>
+                                        </div>
+                                    )}
+                                    {!isLoadingVerdicts && verdictError && (
+                                        <div className="verdict-item">
+                                            <span>{verdictError}</span>
+                                        </div>
+                                    )}
+                                    {!isLoadingVerdicts && !verdictError && popularVerdicts.length === 0 && (
+                                        <div className="verdict-item">
+                                            <span>표시할 판결문이 없습니다.</span>
+                                        </div>
+                                    )}
+                                    {!isLoadingVerdicts && !verdictError && popularVerdicts.map((item, index) => (
+                                        <div
+                                            key={item.debate_room_id}
+                                            className="verdict-item clickable"
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() => togglePanel("verdicts")}
+                                            onKeyDown={(event) => {
+                                                if (event.key === "Enter" || event.key === " ") {
+                                                    event.preventDefault();
+                                                    togglePanel("verdicts");
+                                                }
+                                            }}
+                                        >
+                                            <span>{item.title}</span>
+                                            <span className="tag-pill">{index === 0 ? "TOP" : "HOT"}</span>
+                                        </div>
+                                    ))}
+                                </>
+                            )}
+                        </div>
+                    </section>
                 </aside>
 
                 <section className="lobby-center">
@@ -336,115 +444,6 @@ function HomePage() {
                     </div>
                 </section>
 
-                <aside className="lobby-right">
-                    <section className="card info-card">
-                        <div className="tab-header">
-                            <button
-                                type="button"
-                                className={`tab-btn ${infoTab === "notice" ? "active" : ""}`}
-                                onClick={() => setInfoTab("notice")}
-                            >
-                                공지사항
-                            </button>
-                            <button
-                                type="button"
-                                className={`tab-btn ${infoTab === "tips" ? "active" : ""}`}
-                                onClick={() => setInfoTab("tips")}
-                            >
-                                오늘의 토론 팁
-                            </button>
-                            <button
-                                type="button"
-                                className={`tab-btn ${infoTab === "verdicts" ? "active" : ""}`}
-                                onClick={() => setInfoTab("verdicts")}
-                            >
-                                인기 판결문
-                            </button>
-                        </div>
-
-                        <div className="tab-content">
-                            {infoTab === "notice" && (
-                                <>
-                                    <div className="card-title-row split">
-                                        <h3>공지사항</h3>
-                                        <button type="button" className="text-link">
-                                            자세히 보기
-                                        </button>
-                                    </div>
-                                    <div className="notice-item">
-                                        <strong className="notice-title">랜덤 매칭 오픈 안내</strong>
-                                        <p className="notice-desc">간단한 매칭으로 빠르게 토론에 참여해보세요.</p>
-                                    </div>
-                                    <div className="notice-item">
-                                        <strong className="notice-title">신규 토론 룰북 업데이트</strong>
-                                        <p className="notice-desc">발언 시간과 판정 기준을 확인해 주세요.</p>
-                                    </div>
-                                </>
-                            )}
-
-                            {infoTab === "tips" && (
-                                <>
-                                    <div className="card-title-row">
-                                        <h3>오늘의 토론 팁</h3>
-                                    </div>
-                                    <ul className="tip-list">
-                                        <li>주장은 한 문장으로 요약하고 근거를 붙이세요.</li>
-                                        <li>상대 주장의 핵심을 먼저 요약하면 설득력이 높아집니다.</li>
-                                        <li>사례나 통계로 주장 신뢰도를 높이세요.</li>
-                                    </ul>
-                                </>
-                            )}
-
-                            {infoTab === "verdicts" && (
-                                <>
-                                    <div className="card-title-row split">
-                                        <h3>인기 판결문</h3>
-                                        <button
-                                            type="button"
-                                            className="text-link"
-                                            onClick={() => togglePanel("verdicts")}
-                                        >
-                                            더보기
-                                        </button>
-                                    </div>
-                                    {isLoadingVerdicts && (
-                                        <div className="verdict-item">
-                                            <span>불러오는 중...</span>
-                                        </div>
-                                    )}
-                                    {!isLoadingVerdicts && verdictError && (
-                                        <div className="verdict-item">
-                                            <span>{verdictError}</span>
-                                        </div>
-                                    )}
-                                    {!isLoadingVerdicts && !verdictError && popularVerdicts.length === 0 && (
-                                        <div className="verdict-item">
-                                            <span>표시할 판결문이 없습니다.</span>
-                                        </div>
-                                    )}
-                                    {!isLoadingVerdicts && !verdictError && popularVerdicts.map((item, index) => (
-                                        <div
-                                            key={item.debate_room_id}
-                                            className="verdict-item clickable"
-                                            role="button"
-                                            tabIndex={0}
-                                            onClick={() => togglePanel("verdicts")}
-                                            onKeyDown={(event) => {
-                                                if (event.key === "Enter" || event.key === " ") {
-                                                    event.preventDefault();
-                                                    togglePanel("verdicts");
-                                                }
-                                            }}
-                                        >
-                                            <span>{item.title}</span>
-                                            <span className="tag-pill">{index === 0 ? "TOP" : "HOT"}</span>
-                                        </div>
-                                    ))}
-                                </>
-                            )}
-                        </div>
-                    </section>
-                </aside>
             </div>
 
             <SearchPanel isOpen={activePanel === "search"} onClose={() => setActivePanel(null)} />

@@ -21,7 +21,7 @@ import "../styles/DebatePage.css";
 function DebatePage() {
     const { roomId } = useParams();
     const navigate = useNavigate();
-    const { user: currentUser } = useAuth();
+    const { user: currentUser, refreshUser } = useAuth();
     
     const [room, setRoom] = useState(null);
     const [error, setError] = useState("");
@@ -176,6 +176,7 @@ function DebatePage() {
 
         socket.on("debate_ended", () => {
             setDebateEnded(true);
+            refreshUser?.();
         });
 
         socket.on("error", (err) => {
@@ -183,7 +184,7 @@ function DebatePage() {
         });
 
         return () => socket.disconnect();
-    }, [roomId, currentUser]);
+    }, [roomId, currentUser, refreshUser]);
 
     // 새 메시지 올 때마다 자동 스크롤
     useEffect(() => {

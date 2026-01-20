@@ -21,6 +21,11 @@ function Header() {
         navigate(isMyPage ? "/" : "/mypage");
     };
 
+    const level = user?.level ?? 1;
+    const exp = user?.exp ?? 0;
+    const requiredXp = 100 + 20 * (level - 1) + 5 * ((level - 1) ** 2);
+    const xpPercent = requiredXp > 0 ? Math.min(100, Math.round((exp / requiredXp) * 100)) : 0;
+
     return (
         <div className={`header ${isAuthenticated ? "logged-in" : ""}`}>
             {isAuthenticated ? (
@@ -35,13 +40,12 @@ function Header() {
                         </div>
                         <div className="profile-info">
                             <div className="profile-name">{user?.nickname || "Guest"}</div>
-                            {/* 레벨은 추후 기능 연결 */}
                             <div className="level-bar-container">
                                 <div className="level-divider"></div>
-                                <span className="level-text">레벨 1</span>
+                                <span className="level-text">레벨 {level}</span>
                                 <div className="progress-track">
-                                    <div className="progress-fill"></div>
-                                    <span className="xp-overlay">0 / 100</span>
+                                    <div className="progress-fill" style={{ width: `${xpPercent}%` }}></div>
+                                    <span className="xp-overlay">{exp} / {requiredXp}</span>
                                 </div>
                             </div>
                         </div>
