@@ -182,6 +182,8 @@ class DebateService:
 
         items = []
         for msg in messages:
+            if msg.display_type == "report_user" and str(msg.user_id) != str(user_id):
+                continue
             items.append({
                 "message_id": msg.message_id,
                 "debate_room_id": msg.debate_room_id,
@@ -298,6 +300,72 @@ class DebateService:
             "decided_at": decided_at,
             "decided_by": payload.decided_by
         }
+
+    async def get_popular_verdicts(self, db: AsyncSession, limit: int = 6) -> list[dict]:
+        query = select(DebateRoom).where(
+            DebateRoom.status == DebateStatus.FINISHED
+        ).order_by(
+            desc(DebateRoom.finished_at),
+            desc(DebateRoom.created_at)
+        ).limit(50)
+        result = await db.execute(query)
+        rooms = result.scalars().all()
+
+        verdicts: list[dict] = []
+
+        for room in rooms:
+            msg_query = select(DebateMessage).where(
+                DebateMessage.debate_room_id == room.debate_room_id,
+                DebateMessage.display_type.in_(["report_summary", "report_pro", "report_con"]),
+            ).order_by(DebateMessage.created_at.asc(), DebateMessage.message_id.asc())
+            msg_result = await db.execute(msg_query)
+            messages = msg_result.scalars().all()
+
+            summary = None
+            pro_eval = None
+            con_eval = None
+
+            for msg in messages:
+                if msg.display_type == "report_summary":
+                    summary = msg.content
+                elif msg.display_type == "report_pro":
+                    try:
+                        pro_eval = json.loads(msg.content)
+                    except Exception:
+                        pro_eval = None
+                elif msg.display_type == "report_con":
+                    try:
+                        con_eval = json.loads(msg.content)
+                    except Exception:
+                        con_eval = None
+
+            pro_score = None
+            con_score = None
+            if isinstance(pro_eval, dict):
+                pro_score = pro_eval.get("total_score")
+            if isinstance(con_eval, dict):
+                con_score = con_eval.get("total_score")
+
+            scores = [score for score in [pro_score, con_score] if isinstance(score, (int, float))]
+            if not scores:
+                continue
+            rating = round(sum(scores) / len(scores), 1)
+
+            verdicts.append({
+                "debate_room_id": room.debate_room_id,
+                "title": room.title,
+                "topic": room.topic,
+                "category": room.category,
+                "level": room.level,
+                "finished_at": room.finished_at,
+                "rating": rating,
+                "pro_score": pro_score,
+                "con_score": con_score,
+                "summary": summary,
+            })
+
+        verdicts.sort(key=lambda item: (item["rating"], item["finished_at"] or datetime.min), reverse=True)
+        return verdicts[:limit]
 
     async def random_match(
         self,

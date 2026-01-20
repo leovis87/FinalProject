@@ -11,23 +11,27 @@
     box-shadow: -10px 0 40px rgba(30, 58, 138, 0.1);
     border-left: 1px solid rgba(30, 58, 138, 0.1);
     transform: translateX(100%);
-    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+    opacity: 0;
+    pointer-events: none;
     display: flex;
     flex-direction: column;
 }
 
 .slide-panel-container.open {
     transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .panel-header-area {
     position: relative;
     padding: 20px 50px;
-    background-image: linear-gradient(to right, #1e3a8a, #4e5ca7, #7780c4, #9fa6e1, #c8cdff);
+    background-image: linear-gradient(135deg, #2563eb 0%, #4f8df4 55%, #7db7fb 100%);
 }
 
 .panel-header-area.sub {
-    background-image: linear-gradient(to right, #767587, #838294, #908fa1, #9d9cae, #aaa9bc);
+    background-image: linear-gradient(135deg, #3b82f6 0%, #60a5fa 55%, #93c5fd 100%);
 }
 
 .panel-title {

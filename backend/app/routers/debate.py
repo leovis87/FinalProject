@@ -14,6 +14,7 @@ from schemas.debate import (
     DebateHistoryItem,
     DebateMessageResponse,
     DebateVerdictResponse,
+    PopularVerdictItem,
     DebateResultUpsertRequest,
     DebateResultUpsertResponse
 )
@@ -87,6 +88,14 @@ async def get_debate_verdict(
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+@router.get("/verdicts/popular", response_model=List[PopularVerdictItem])
+async def get_popular_verdicts(
+    limit: int = 6,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return await debate_service.get_popular_verdicts(db, limit=limit)
 
 @router.get("/{debate_id}", response_model=DebateRoomResponse)
 async def get_debate_room(

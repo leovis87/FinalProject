@@ -9,8 +9,8 @@ import {
     CartesianGrid,
     Tooltip
 } from "recharts";
-import "../styles/MyPage.css";
 import "../styles/Modal.css";
+import "../styles/MyPage.css";
 
 function MyPage() {
     const { user } = useAuth();
@@ -27,6 +27,9 @@ function MyPage() {
     const [verdictError, setVerdictError] = useState("");
     const [verdictData, setVerdictData] = useState(null);
     const [verdictMeta, setVerdictMeta] = useState(null);
+    const [feedbackStatus, setFeedbackStatus] = useState("idle");
+    const [feedbackError, setFeedbackError] = useState("");
+    const [feedbackData, setFeedbackData] = useState(null);
 
     const mockProfile = useMemo(() => ({
         nickname: user?.nickname || "Guest",
@@ -36,27 +39,47 @@ function MyPage() {
         maxXp: 100,
     }), [user]);
 
-    const stats = [
-        { label: "총 토론 수", value: "24회" },
-        { label: "승률", value: "58%" },
-        { label: "최근 7일 참여", value: "5회" },
-    ];
+    const activityData = useMemo(() => {
+        const weekLabels = ["일", "월", "화", "수", "목", "금", "토"];
+        const counts = Array.from({ length: 7 }, (_, idx) => ({ name: weekLabels[idx], debates: 0 }));
+        const now = new Date();
+        const start = new Date(now);
+        start.setDate(start.getDate() - 6);
+        start.setHours(0, 0, 0, 0);
 
-    const activityData = [
-        { name: "월", debates: 2 },
-        { name: "화", debates: 1 },
-        { name: "수", debates: 3 },
-        { name: "목", debates: 2 },
-        { name: "금", debates: 4 },
-        { name: "토", debates: 1 },
-        { name: "일", debates: 2 },
-    ];
+        historyRecords.forEach((record) => {
+            if (!record.rawDate) return;
+            const date = new Date(record.rawDate);
+            if (Number.isNaN(date.getTime())) return;
+            if (date < start || date > now) return;
+            const dayIndex = date.getDay();
+            counts[dayIndex].debates += 1;
+        });
 
-    const recentDebates = [
-        { id: 1, title: "플라스틱 규제, 어디까지?", date: "2025.01.12", result: "승리" },
-        { id: 2, title: "최저임금 인상, 필요한가?", date: "2025.01.09", result: "패배" },
-        { id: 3, title: "온라인 익명성 보장 여부", date: "2025.01.05", result: "승리" },
-    ];
+        return counts;
+    }, [historyRecords]);
+
+    const stats = useMemo(() => {
+        const total = historyRecords.length;
+        const wins = historyRecords.filter((record) => record.result === "승리").length;
+        const winRate = total ? Math.round((wins / total) * 100) : 0;
+        const recentCount = activityData.reduce((sum, item) => sum + item.debates, 0);
+        return [
+            { label: "총 토론 수", value: `${total}회` },
+            { label: "승률", value: `${winRate}%` },
+            { label: "최근 7일 참여", value: `${recentCount}회` },
+        ];
+    }, [activityData, historyRecords]);
+
+    const recentDebates = useMemo(() => {
+        if (!historyRecords.length) return [];
+        return historyRecords.slice(0, 3).map((record) => ({
+            id: record.id,
+            title: record.title,
+            date: record.date,
+            result: record.result,
+        }));
+    }, [historyRecords]);
 
     useEffect(() => {
         let isMounted = true;
@@ -115,6 +138,7 @@ function MyPage() {
                     id: item.debate_room_id ?? item.id,
                     title: item.title || item.topic || "Untitled",
                     date: formatDate(item.finished_at || item.started_at || item.joined_at),
+                    rawDate: item.finished_at || item.started_at || item.joined_at,
                     role: mapRole(item.role),
                     result: mapResult(item.result),
                 }));
@@ -138,6 +162,54 @@ function MyPage() {
             isMounted = false;
         };
     }, [user]);
+
+    useEffect(() => {
+        const token = localStorage.getItem("access_token");
+        if (!token || historyRecords.length === 0) {
+            setFeedbackStatus("idle");
+            setFeedbackData(null);
+            return;
+        }
+
+        const latest = historyRecords[0];
+        let isMounted = true;
+
+        const fetchFeedback = async () => {
+            setFeedbackStatus("loading");
+            setFeedbackError("");
+            try {
+                const response = await fetch(`http://localhost:8000/api/debates/${latest.id}/verdict`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+                if (!response.ok) {
+                    throw new Error("AI 피드백을 불러오지 못했습니다.");
+                }
+                const data = await response.json();
+                if (isMounted) {
+                    setFeedbackData({
+                        topic: latest.title,
+                        summary: data.summary || "",
+                        proEval: data.pro_eval || null,
+                        conEval: data.con_eval || null,
+                    });
+                    setFeedbackStatus("success");
+                }
+            } catch (error) {
+                if (isMounted) {
+                    setFeedbackStatus("error");
+                    setFeedbackError(error?.message || "AI 피드백을 불러오지 못했습니다.");
+                }
+            }
+        };
+
+        fetchFeedback();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [historyRecords]);
 
     const badges = [
         { id: 1, name: "첫 토론 완주", earned: true },
@@ -238,6 +310,9 @@ function MyPage() {
                 historyError={historyError}
                 onReplay={handleOpenReplay}
                 onVerdict={handleOpenVerdict}
+                feedbackStatus={feedbackStatus}
+                feedbackError={feedbackError}
+                feedbackData={feedbackData}
                 badges={badges}
                 nickname={mockProfile.nickname}
             />
@@ -315,7 +390,20 @@ function StatsOverview({ stats }) {
     );
 }
 
-function ActivityTabs({ activityData, recentDebates, historyRecords, historyStatus, historyError, onReplay, onVerdict, badges, nickname }) {
+function ActivityTabs({
+    activityData,
+    recentDebates,
+    historyRecords,
+    historyStatus,
+    historyError,
+    onReplay,
+    onVerdict,
+    feedbackStatus,
+    feedbackError,
+    feedbackData,
+    badges,
+    nickname
+}) {
     const [activeTab, setActiveTab] = useState("summary");
 
     return (
@@ -353,7 +441,14 @@ function ActivityTabs({ activityData, recentDebates, historyRecords, historyStat
 
             <div className="tabs-body">
                 {activeTab === "summary" && (
-                    <ActivitySummaryTab activityData={activityData} recentDebates={recentDebates} />
+                    <ActivitySummaryTab
+                        activityData={activityData}
+                        recentDebates={recentDebates}
+                        onVerdict={onVerdict}
+                        feedbackStatus={feedbackStatus}
+                        feedbackError={feedbackError}
+                        feedbackData={feedbackData}
+                    />
                 )}
                 {activeTab === "history" && (
                     <HistoryTab
@@ -371,7 +466,31 @@ function ActivityTabs({ activityData, recentDebates, historyRecords, historyStat
     );
 }
 
-function ActivitySummaryTab({ activityData, recentDebates }) {
+function ActivitySummaryTab({ activityData, recentDebates, onVerdict, feedbackStatus, feedbackError, feedbackData }) {
+    const pickHighlights = (evalData) => {
+        if (!evalData?.scores) return null;
+        const labels = {
+            clarity: "주장 명확성",
+            evidence: "근거 적합성",
+            interaction: "상호작용",
+            attitude: "태도",
+        };
+        const entries = Object.entries(evalData.scores)
+            .map(([key, value]) => ({ key, label: labels[key] || key, value }))
+            .filter((item) => item.value !== undefined && item.value !== null);
+        if (!entries.length) return null;
+        const sorted = [...entries].sort((a, b) => b.value - a.value);
+        return {
+            strength: sorted[0],
+            improvement: sorted[sorted.length - 1],
+        };
+    };
+
+    const highlight = feedbackData?.proEval || feedbackData?.conEval ? {
+        pro: pickHighlights(feedbackData?.proEval),
+        con: pickHighlights(feedbackData?.conEval),
+    } : null;
+
     return (
         <div className="summary-grid">
             <div className="summary-chart">
@@ -404,10 +523,24 @@ function ActivitySummaryTab({ activityData, recentDebates }) {
                                 <span>{debate.date}</span>
                             </div>
                             <div className="recent-actions">
-                                <span className={`result-pill ${debate.result === "승리" ? "win" : "lose"}`}>
+                                <span
+                                    className={`result-pill ${
+                                        debate.result === "승리"
+                                            ? "win"
+                                            : debate.result === "패배"
+                                                ? "lose"
+                                                : debate.result === "무승부"
+                                                    ? "draw"
+                                                    : "pending"
+                                    }`}
+                                >
                                     {debate.result}
                                 </span>
-                                <button type="button" className="mypage-action-btn secondary small">
+                                <button
+                                    type="button"
+                                    className="mypage-action-btn secondary small"
+                                    onClick={() => onVerdict?.(debate)}
+                                >
                                     판결문 보기
                                 </button>
                             </div>
@@ -421,26 +554,98 @@ function ActivitySummaryTab({ activityData, recentDebates }) {
                     <h3>AI 피드백</h3>
                     <span className="section-desc">최근 토론 요약</span>
                 </div>
-                <ul>
-                    <li>주장의 구조가 명확하고 상대의 논점을 잘 요약했습니다.</li>
-                    <li>근거 제시가 조금 더 구체적이면 설득력이 높아집니다.</li>
-                    <li>다음 토론에서는 반박 타이밍을 조금 더 빠르게 가져가 보세요.</li>
-                </ul>
+                {feedbackStatus === "loading" && (
+                    <div className="summary-feedback-state">피드백을 불러오는 중...</div>
+                )}
+                {feedbackStatus === "error" && (
+                    <div className="summary-feedback-state error">{feedbackError}</div>
+                )}
+                {feedbackStatus === "success" && feedbackData && (
+                    <div className="summary-feedback-content">
+                        <div className="summary-feedback-header">
+                            <strong>{feedbackData.topic}</strong>
+                            {feedbackData.summary && <p>{feedbackData.summary}</p>}
+                        </div>
+                        {highlight && (
+                            <div className="summary-feedback-grid">
+                                {highlight.pro && (
+                                    <div className="summary-feedback-card">
+                                        <span>찬성팀</span>
+                                        <p>강점: {highlight.pro.strength.label} {highlight.pro.strength.value}점</p>
+                                        <p>개선: {highlight.pro.improvement.label} {highlight.pro.improvement.value}점</p>
+                                    </div>
+                                )}
+                                {highlight.con && (
+                                    <div className="summary-feedback-card">
+                                        <span>반대팀</span>
+                                        <p>강점: {highlight.con.strength.label} {highlight.con.strength.value}점</p>
+                                        <p>개선: {highlight.con.improvement.label} {highlight.con.improvement.value}점</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        <div className="summary-feedback-action">
+                            다음 토론에서는 낮은 항목을 우선 개선해보세요.
+                        </div>
+                    </div>
+                )}
+                {feedbackStatus === "idle" && (
+                    <div className="summary-feedback-state">표시할 피드백이 없습니다.</div>
+                )}
             </div>
         </div>
     );
 }
 
 function HistoryTab({ historyRecords, historyStatus, historyError, onReplay, onVerdict }) {
+    const [rangeFilter, setRangeFilter] = useState("7d");
+    const [resultFilter, setResultFilter] = useState("all");
+
+    const filteredRecords = useMemo(() => {
+        const now = new Date();
+        const start = new Date(now);
+        if (rangeFilter === "7d") {
+            start.setDate(start.getDate() - 6);
+        } else if (rangeFilter === "30d") {
+            start.setDate(start.getDate() - 29);
+        }
+        start.setHours(0, 0, 0, 0);
+
+        return historyRecords.filter((record) => {
+            if (rangeFilter !== "all") {
+                if (!record.rawDate) return false;
+                const date = new Date(record.rawDate);
+                if (Number.isNaN(date.getTime())) return false;
+                if (date < start || date > now) return false;
+            }
+
+            if (resultFilter !== "all") {
+                if (resultFilter === "win" && record.result !== "승리") return false;
+                if (resultFilter === "lose" && record.result !== "패배") return false;
+                if (resultFilter === "draw" && record.result !== "무승부") return false;
+            }
+
+            return true;
+        });
+    }, [historyRecords, rangeFilter, resultFilter]);
+
     return (
         <div className="history-tab">
             <div className="history-filters">
-                <select className="filter-select" defaultValue="7d">
+                <select
+                    className="filter-select"
+                    value={rangeFilter}
+                    onChange={(event) => setRangeFilter(event.target.value)}
+                >
                     <option value="7d">최근 7일</option>
                     <option value="30d">최근 30일</option>
                     <option value="all">전체</option>
                 </select>
-                <select className="filter-select" defaultValue="all">
+                <select
+                    className="filter-select"
+                    value={resultFilter}
+                    onChange={(event) => setResultFilter(event.target.value)}
+                >
                     <option value="all">전체 결과</option>
                     <option value="win">승리</option>
                     <option value="lose">패배</option>
@@ -456,10 +661,10 @@ function HistoryTab({ historyRecords, historyStatus, historyError, onReplay, onV
                         {historyError || "기록을 불러오지 못했습니다."}
                     </div>
                 )}
-                {historyStatus !== "loading" && historyStatus !== "error" && historyRecords.length === 0 && (
+                {historyStatus !== "loading" && historyStatus !== "error" && filteredRecords.length === 0 && (
                     <div className="history-row history-empty">아직 기록이 없습니다.</div>
                 )}
-                {historyRecords.map((record) => (
+                {filteredRecords.map((record) => (
                     <div key={record.id} className="history-row">
                         <div>
                             <strong>{record.title}</strong>
@@ -491,6 +696,192 @@ function HistoryTab({ historyRecords, historyStatus, historyError, onReplay, onV
 }
 
 function ReplayModal({ record, status, error, messages, onClose }) {
+    const parseFeedback = (text) => {
+        if (!text) return [];
+        return text
+            .split("###")
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .map((part) => {
+                const match = part.match(/\[(.+?)\]\s*\((\d+)점\)\s*-\s*(.*)/s);
+                if (match) {
+                    return {
+                        title: match[1],
+                        score: match[2],
+                        body: match[3].trim(),
+                    };
+                }
+                return {
+                    title: "추가 정보",
+                    score: null,
+                    body: part,
+                };
+            });
+    };
+    const scoreItems = (scores) => {
+        if (!scores) return [];
+        return [
+            { label: "주장 명확성", value: scores.clarity },
+            { label: "근거 적합성", value: scores.evidence },
+            { label: "상호작용", value: scores.interaction },
+            { label: "태도", value: scores.attitude },
+        ].filter((item) => item.value !== undefined && item.value !== null);
+    };
+    const parseAiEvaluation = (content) => {
+        if (typeof content !== "string") return null;
+        try {
+            const data = JSON.parse(content);
+            if (!data || typeof data !== "object") return null;
+            if (!("total_score" in data) || !("feedback_text" in data)) return null;
+            return data;
+        } catch (error) {
+            return null;
+        }
+    };
+    const parseSummaryPayload = (content) => {
+        if (typeof content !== "string") return null;
+        try {
+            const data = JSON.parse(content);
+            if (!data || typeof data !== "object") return null;
+            if (data.title && (data.summary || data.pro_items || data.con_items)) {
+                return data;
+            }
+            if (data.round && data.pro_items && data.con_items) {
+                return data;
+            }
+        } catch (error) {
+            return null;
+        }
+        return null;
+    };
+    const parseItemsPayload = (content) => {
+        if (typeof content !== "string") return null;
+        try {
+            const data = JSON.parse(content);
+            if (!data || typeof data !== "object") return null;
+            if (data.title && Array.isArray(data.items)) {
+                return data;
+            }
+        } catch (error) {
+            return null;
+        }
+        return null;
+    };
+
+    const renderSummaryCard = (data) => {
+        if (!data) return null;
+        const proItems = Array.isArray(data.pro_items) ? data.pro_items : [];
+        const conItems = Array.isArray(data.con_items) ? data.con_items : [];
+
+        return (
+            <div className="replay-message replay-summary">
+                <div className="replay-message-head">
+                    <span className="replay-role">AI 요약</span>
+                    <span className="replay-time">{data.round ? `Turn ${data.round}` : "-"}</span>
+                </div>
+                <div className="replay-summary-card">
+                    <div className="replay-summary-title">{data.title || "요약"}</div>
+                    {data.summary && <div className="replay-summary-text">{data.summary}</div>}
+                    <div className="replay-summary-grid">
+                        <div className="replay-summary-col pro">
+                            <div className="replay-summary-col-title">찬성측 입장 요약</div>
+                            {proItems.length === 0 ? (
+                                <div className="replay-summary-empty">내용 없음</div>
+                            ) : (
+                                <ul>
+                                    {proItems.map((item, index) => (
+                                        <li key={`replay-pro-${index}`}>{item}</li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                        <div className="replay-summary-col con">
+                            <div className="replay-summary-col-title">반대측 입장 요약</div>
+                            {conItems.length === 0 ? (
+                                <div className="replay-summary-empty">내용 없음</div>
+                            ) : (
+                                <ul>
+                                    {conItems.map((item, index) => (
+                                        <li key={`replay-con-${index}`}>{item}</li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const normalizeMessages = (list) => {
+        const output = [];
+        let topicIndex = -1;
+        for (const msg of list) {
+            const summaryPayload = parseSummaryPayload(msg.content);
+            if (summaryPayload) {
+                topicIndex = output.length;
+                output.push({ ...msg });
+                continue;
+            }
+            const payload = parseItemsPayload(msg.content);
+            if (!payload) {
+                output.push({ ...msg });
+                continue;
+            }
+
+            const title = payload.title || "";
+            const isPro = title.includes("찬성");
+            const isCon = title.includes("반대");
+            if (!isPro && !isCon) {
+                output.push(msg);
+                continue;
+            }
+
+            if (topicIndex >= 0) {
+                const existing = output[topicIndex];
+                const existingPayload = parseSummaryPayload(existing.content) || {};
+                const merged = {
+                    title: existingPayload.title || "토론 주제 요약",
+                    summary: existingPayload.summary || "",
+                    pro_items: Array.isArray(existingPayload.pro_items) ? existingPayload.pro_items : [],
+                    con_items: Array.isArray(existingPayload.con_items) ? existingPayload.con_items : [],
+                };
+                if (isPro) merged.pro_items = payload.items;
+                if (isCon) merged.con_items = payload.items;
+                existing.content = JSON.stringify(merged);
+                continue;
+            }
+
+            const existing = output.find((entry) => entry.__summaryBucket);
+            if (existing) {
+                if (isPro) existing.__summaryBucket.pro_items = payload.items;
+                if (isCon) existing.__summaryBucket.con_items = payload.items;
+                existing.content = JSON.stringify({
+                    title: "토론 주제 요약",
+                    pro_items: existing.__summaryBucket.pro_items,
+                    con_items: existing.__summaryBucket.con_items,
+                });
+                continue;
+            }
+
+            output.push({
+                ...msg,
+                content: JSON.stringify({
+                    title: "토론 주제 요약",
+                    pro_items: isPro ? payload.items : [],
+                    con_items: isCon ? payload.items : [],
+                }),
+                __summaryBucket: {
+                    pro_items: isPro ? payload.items : [],
+                    con_items: isCon ? payload.items : [],
+                },
+            });
+        }
+        return output;
+    };
+
+    const normalizedMessages = useMemo(() => normalizeMessages(messages), [messages]);
+
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content replay-modal" onClick={(event) => event.stopPropagation()}>
@@ -509,22 +900,99 @@ function ReplayModal({ record, status, error, messages, onClose }) {
                 <div className="replay-body">
                     {status === "loading" && <div className="replay-status">리플레이를 불러오는 중...</div>}
                     {status === "error" && <div className="replay-status error">{error || "불러오지 못했습니다."}</div>}
-                    {status === "success" && messages.length === 0 && (
+                    {status === "success" && normalizedMessages.length === 0 && (
                         <div className="replay-status">표시할 메시지가 없습니다.</div>
                     )}
-                    {status === "success" && messages.length > 0 && (
+                    {status === "success" && normalizedMessages.length > 0 && (
                         <div className="replay-list">
-                            {messages.map((msg) => (
-                                <div key={msg.message_id} className={`replay-message ${msg.role}`}>
-                                    <div className="replay-message-head">
-                                        <span className="replay-role">{msg.user_name || msg.role}</span>
-                                        <span className="replay-time">
-                                            {msg.turn ? `Turn ${msg.turn}` : "-"}
-                                        </span>
+                            {normalizedMessages.map((msg) => {
+                                const aiEval = parseAiEvaluation(msg.content);
+                                if (aiEval) {
+                                    const feedbackItems = parseFeedback(aiEval.feedback_text || "");
+                                    return (
+                                        <div key={msg.message_id} className="replay-message replay-eval">
+                                            <div className="replay-message-head">
+                                                <span className="replay-role">AI 평가</span>
+                                                <span className="replay-time">
+                                                    {msg.turn ? `Turn ${msg.turn}` : "-"}
+                                                </span>
+                                            </div>
+                                            <div className="replay-eval-summary">
+                                                <strong>{aiEval.total_score}점</strong>
+                                                {scoreItems(aiEval.scores).length > 0 && (
+                                                    <div className="replay-eval-scores">
+                                                        {scoreItems(aiEval.scores).map((item) => (
+                                                            <div key={item.label} className="replay-eval-score">
+                                                                <span>{item.label}</span>
+                                                                <span>{item.value}점</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {feedbackItems.length > 0 && (
+                                                <div className="replay-eval-feedback">
+                                                    {feedbackItems.map((item, index) => (
+                                                        <div key={`${item.title}-${index}`} className="replay-eval-item">
+                                                            <div className="replay-eval-head">
+                                                                <span>{item.title}</span>
+                                                                {item.score && <span className="replay-eval-badge">{item.score}점</span>}
+                                                            </div>
+                                                            <p>{item.body}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {aiEval.fact_check_result && (
+                                                <div className="replay-eval-fact">
+                                                    <span>Fact-check</span>
+                                                    <p>{aiEval.fact_check_result}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                }
+                                const summaryPayload = parseSummaryPayload(msg.content);
+                                if (summaryPayload) {
+                                    return (
+                                        <div key={msg.message_id}>
+                                            {renderSummaryCard(summaryPayload)}
+                                        </div>
+                                    );
+                                }
+                                const itemsPayload = parseItemsPayload(msg.content);
+                                if (itemsPayload) {
+                                    return (
+                                        <div key={msg.message_id} className="replay-message ai">
+                                            <div className="replay-message-head">
+                                                <span className="replay-role">AI</span>
+                                                <span className="replay-time">
+                                                    {msg.turn ? `Turn ${msg.turn}` : "-"}
+                                                </span>
+                                            </div>
+                                            <div className="replay-content">
+                                                <strong>{itemsPayload.title}</strong>
+                                                <ul className="replay-items-list">
+                                                    {itemsPayload.items.map((item, index) => (
+                                                        <li key={`item-${index}`}>{item}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <div key={msg.message_id} className={`replay-message ${msg.role}`}>
+                                        <div className="replay-message-head">
+                                            <span className="replay-role">{msg.user_name || msg.role}</span>
+                                            <span className="replay-time">
+                                                {msg.turn ? `Turn ${msg.turn}` : "-"}
+                                            </span>
+                                        </div>
+                                        <div className="replay-content">{msg.content}</div>
                                     </div>
-                                    <div className="replay-content">{msg.content}</div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -536,6 +1004,52 @@ function ReplayModal({ record, status, error, messages, onClose }) {
 function VerdictModal({ record, status, error, verdict, onClose }) {
     const proEval = verdict?.pro_eval || null;
     const conEval = verdict?.con_eval || null;
+    const parseFeedback = (text) => {
+        if (!text) return [];
+        const normalized = text.replace(/\r\n/g, "\n");
+        const parts = normalized.split(/\n(?=\*\*\[|###\s*\[)/);
+        const items = [];
+
+        parts.forEach((part) => {
+            const chunk = part.trim();
+            if (!chunk) return;
+
+            const titleMatch = chunk.match(/\*\*\[([^\]]+)\]\*\*|###\s*\[([^\]]+)\]/);
+            const title = titleMatch ? (titleMatch[1] || titleMatch[2]) : null;
+            const scoreMatch = chunk.match(/점수\s*:\s*(\d+)\s*점/);
+            const score = scoreMatch ? scoreMatch[1] : null;
+
+            let body = chunk;
+            if (titleMatch) {
+                body = body.replace(titleMatch[0], "");
+            }
+            body = body.replace(/-?\s*점수\s*:\s*\d+\s*점\s*/g, "");
+            body = body.replace(/-?\s*근거\s*:\s*/g, "");
+            body = body.replace(/^\s*[-•]\s*/gm, "");
+            body = body.trim();
+
+            if (!title && !body) return;
+
+            items.push({
+                title: title || "추가 정보",
+                score,
+                body,
+            });
+        });
+
+        return items;
+    };
+    const proFeedback = parseFeedback(proEval?.feedback_text || "");
+    const conFeedback = parseFeedback(conEval?.feedback_text || "");
+    const scoreItems = (scores) => {
+        if (!scores) return [];
+        return [
+            { label: "주장 명확성", value: scores.clarity },
+            { label: "근거 적합성", value: scores.evidence },
+            { label: "상호작용", value: scores.interaction },
+            { label: "태도", value: scores.attitude },
+        ].filter((item) => item.value !== undefined && item.value !== null);
+    };
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -566,16 +1080,22 @@ function VerdictModal({ record, status, error, verdict, onClose }) {
                                 </div>
                             )}
                             <div className="verdict-scores">
-                                <div className="verdict-card pro">
-                                    <h4>찬성 팀</h4>
-                                    <strong>{proEval?.total_score ?? "-"}점</strong>
-                                    {proEval?.feedback_text && <p>{proEval.feedback_text}</p>}
-                                </div>
-                                <div className="verdict-card con">
-                                    <h4>반대 팀</h4>
-                                    <strong>{conEval?.total_score ?? "-"}점</strong>
-                                    {conEval?.feedback_text && <p>{conEval.feedback_text}</p>}
-                                </div>
+                                <VerdictTeamStack
+                                    title="찬성팀"
+                                    tone="pro"
+                                    totalScore={proEval?.total_score}
+                                    scores={scoreItems(proEval?.scores)}
+                                    feedback={proFeedback}
+                                    factCheck={proEval?.fact_check_result}
+                                />
+                                <VerdictTeamStack
+                                    title="반대팀"
+                                    tone="con"
+                                    totalScore={conEval?.total_score}
+                                    scores={scoreItems(conEval?.scores)}
+                                    feedback={conFeedback}
+                                    factCheck={conEval?.fact_check_result}
+                                />
                             </div>
                             {verdict.best_player && (
                                 <div className="verdict-section highlight">
@@ -586,6 +1106,44 @@ function VerdictModal({ record, status, error, verdict, onClose }) {
                     )}
                 </div>
             </div>
+        </div>
+    );
+}
+
+function VerdictTeamStack({ title, tone, totalScore, scores, feedback, factCheck }) {
+    return (
+        <div className={`verdict-card stacked ${tone}`}>
+            <div className="verdict-team-header">
+                <span>{title}</span>
+                <strong>{totalScore ?? "-"}점</strong>
+            </div>
+            <div className="verdict-team-section">
+                <div className="verdict-team-section-title">상세 평가</div>
+                {scores.length > 0 ? (
+                    <div className="verdict-score-stack">
+                        {scores.map((item) => {
+                            const detail = feedback?.find((entry) => entry.title === item.label);
+                            return (
+                                <div key={item.label} className="verdict-score-row">
+                                    <div className="verdict-score-label">
+                                        <span>{item.label}</span>
+                                        <span className="verdict-score-badge">{item.value}점</span>
+                                    </div>
+                                    {detail?.body && <p>{detail.body}</p>}
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <p>상세 평가가 없습니다.</p>
+                )}
+            </div>
+            {factCheck && (
+                <div className="verdict-factcheck">
+                    <span>Fact-check</span>
+                    <p>{factCheck}</p>
+                </div>
+            )}
         </div>
     );
 }

@@ -279,7 +279,7 @@ def _build_room_state(room: DebateRoom, participants: List[DebateParticipant]) -
     }
 
 
-def _graph_base_state(room_state: dict) -> dict:
+def _graph_base_state(room_state: dict, include_premium: bool = False) -> dict:
     return {
         "room_id": int(room_state["room_id"]),
         "topic": room_state["topic"],
@@ -289,7 +289,7 @@ def _graph_base_state(room_state: dict) -> dict:
             {
                 "user_id": u["user_id"],
                 "user_name": u["user_name"],
-                "is_premium": False,
+                "is_premium": include_premium,
             }
             for u in room_state["pro_users"]
         ],
@@ -297,7 +297,7 @@ def _graph_base_state(room_state: dict) -> dict:
             {
                 "user_id": u["user_id"],
                 "user_name": u["user_name"],
-                "is_premium": False,
+                "is_premium": include_premium,
             }
             for u in room_state["con_users"]
         ],
@@ -621,6 +621,73 @@ def _make_system_message(room_state: dict, content: str) -> dict:
     }
 
 
+def _sids_for_user(room_id_str: str, user_id: str) -> List[str]:
+    targets = []
+    for sid, room_id in _sid_to_room.items():
+        if room_id != room_id_str:
+            continue
+        if str(_sid_to_user.get(sid)) == str(user_id):
+            targets.append(sid)
+    return targets
+
+
+def _filter_messages_for_user(messages: List[dict], user_id: Optional[str]) -> List[dict]:
+    if not messages:
+        return []
+    filtered = []
+    for message in messages:
+        if message.get("display_type") == "report_user":
+            if user_id is None or str(message.get("user_id")) != str(user_id):
+                continue
+        filtered.append(message)
+    return filtered
+
+
+def _get_personal_feedbacks(room_state: dict) -> Dict[str, dict]:
+    state = _graph_base_state(room_state, include_premium=True)
+    state["messages"] = list(room_state.get("dialogue_messages", []))
+    config = _graph_config(f"debate_{room_state['room_id']}_personal")
+
+    feedbacks: Dict[str, dict] = {}
+
+    try:
+        pro_result = debate_app.invoke(Command(update=state, goto="pro_feedback"), config)
+        if isinstance(pro_result, dict):
+            feedbacks.update(pro_result.get("premium_feedbacks", {}) or {})
+    except Exception:
+        traceback.print_exc()
+
+    try:
+        con_result = debate_app.invoke(Command(update=state, goto="con_feedback"), config)
+        if isinstance(con_result, dict):
+            feedbacks.update(con_result.get("premium_feedbacks", {}) or {})
+    except Exception:
+        traceback.print_exc()
+
+    return _to_json_safe(feedbacks) or {}
+
+
+async def _emit_personal_feedback(room_state: dict, user_id: str, report: dict) -> None:
+    message = {
+        "turn": room_state.get("current_round", 0),
+        "role": "ai",
+        "user_id": str(user_id),
+        "user_name": "Moderator",
+        "content": report,
+        "display_type": "report_user",
+    }
+    room_state["messages"].append(message)
+    await _save_message(room_state, message)
+
+    room_id_str = str(room_state["room_id"])
+    for sid in _sids_for_user(room_id_str, str(user_id)):
+        await sio.emit(
+            "debate_update",
+            _message_payload(message, room_state, replace=False),
+            to=sid,
+        )
+
+
 async def _emit_system_message(room_state: dict, content: str) -> None:
     message = _make_system_message(room_state, content)
     room_state["messages"].append(message)
@@ -708,6 +775,22 @@ def _parse_round_summary(summary_text: str) -> Optional[dict]:
     return {"pro": pro_text, "con": con_text}
 
 
+def _split_summary_lines(text: str) -> List[str]:
+    if not text:
+        return []
+    lines = []
+    for raw in text.splitlines():
+        cleaned = raw.strip()
+        if not cleaned:
+            continue
+        if cleaned.startswith("- "):
+            cleaned = cleaned[2:].strip()
+        elif cleaned.startswith("• "):
+            cleaned = cleaned[2:].strip()
+        lines.append(cleaned)
+    return lines
+
+
 async def _complete_turn(
     room_state: dict,
     room_id_str: str,
@@ -771,14 +854,17 @@ async def _complete_turn(
         if not parts:
             await _emit_system_message(room_state, summary_text)
         else:
-            await _emit_system_message(room_state, f"{round_number}라운드가 종료되었습니다.")
+            pro_lines = _split_summary_lines(parts.get("pro", ""))
+            con_lines = _split_summary_lines(parts.get("con", ""))
             await _emit_system_message(
                 room_state,
-                f"찬성측의 입장은 다음과 같습니다.\n - {parts.get('pro', '')}",
-            )
-            await _emit_system_message(
-                room_state,
-                f"반대측의 입장은 다음과 같습니다.\n - {parts.get('con', '')}",
+                {
+                    "round": round_number,
+                    "title": f"{round_number}라운드 요약",
+                    "pro_items": pro_lines,
+                    "con_items": con_lines,
+                },
+                "summary_round",
             )
     except Exception:
         traceback.print_exc()
@@ -872,6 +958,16 @@ async def _finalize_debate(room_state: dict, room_id_str: str, sid: Optional[str
         await _emit_error("Final report failed.", room_id_str, sid=sid)
     finally:
         await _emit_loading_end(room_state)
+
+    try:
+        personal_feedbacks = _get_personal_feedbacks(room_state)
+        if personal_feedbacks:
+            for user_id, report in personal_feedbacks.items():
+                if not isinstance(report, dict):
+                    report = {"message": str(report)}
+                await _emit_personal_feedback(room_state, user_id, report)
+    except Exception:
+        traceback.print_exc()
 
     saved_result = False
     payload = _build_result_payload(room_state, report_data)
@@ -998,10 +1094,14 @@ async def handle_join(sid, data):
 
     if room_id in _room_states:
         room_state = _room_states[room_id]
+        safe_messages = _filter_messages_for_user(
+            list(room_state.get("messages", [])),
+            str(user_id) if user_id is not None else None,
+        )
         await sio.emit(
             "debate_update",
             {
-                "messages": list(room_state.get("messages", [])),
+                "messages": safe_messages,
                 "replace_messages": True,
                 **_round_payload(room_state),
             },
@@ -1111,14 +1211,17 @@ async def handle_start(sid, data):
                     if not parts:
                         await _emit_system_message(room_state, "Topic summary is not available.")
                     else:
-                        await _emit_system_message(room_state, f"{parts['summary']}")
+                        pro_lines = _split_summary_lines(parts.get("pro", ""))
+                        con_lines = _split_summary_lines(parts.get("con", ""))
                         await _emit_system_message(
                             room_state,
-                            f"찬성측 입장은 다음과 같습니다.\n{parts['pro']}",
-                        )
-                        await _emit_system_message(
-                            room_state,
-                            f"반대측 입장은 다음과 같습니다.\n{parts['con']}",
+                            {
+                                "title": "토론 주제 요약",
+                                "summary": parts.get("summary", ""),
+                                "pro_items": pro_lines,
+                                "con_items": con_lines,
+                            },
+                            "summary_topic",
                         )
                     graph_payload = _debug_payload("info", "GRAPH", room_id_str, str(user_id), "topic_summary done")
                     _debug_print(graph_payload, state=str(room.status))
