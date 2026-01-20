@@ -432,7 +432,26 @@ function DebatePage() {
 // 컴포넌트 분리: 메시지 행 (여기서 찢어서 출력 처리)
 function MessageRow({ msg, isMe }) {
     if (msg.displayType === 'system') return <div className="system-message"><span>{msg.content}</span></div>;
+
+    if (msg.displayType === 'report_user') {
+        const feedback = parsePersonalFeedback(msg.content);
+        return <PersonalFeedbackCard data={feedback} />;
+    }
     
+    // ⭐ [신규] 요약 카드: 라운드/주제 요약
+    if (msg.displayType === 'summary_round') {
+        return <SummaryRoundCard data={msg.content} />;
+    }
+
+    if (msg.displayType === 'summary_topic') {
+        return <SummaryTopicCard data={msg.content} />;
+    }
+
+    if (msg.displayType === 'summary_pro' || msg.displayType === 'summary_con') {
+        const tone = msg.displayType === 'summary_pro' ? 'pro' : 'con';
+        return <SummaryListCard title={msg.content?.title} items={msg.content?.items} tone={tone} />;
+    }
+
     // ⭐ [신규] 찢어서 출력하기 1: 전체 총평 요약 (display_type: report_summary)
     if (msg.displayType === 'report_summary') return (
         <div className="report-item summary">
@@ -540,6 +559,189 @@ function TeamResultCard({ title, data, type }) {
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
+
+function SummaryTextCard({ title, text }) {
+    return (
+        <div className="report-item summary topic">
+            <div className="report-tag"><RiFileTextLine /> {title || '토론 주제 요약'}</div>
+            <div className="report-content">{text || '내용 없음'}</div>
+        </div>
+    );
+}
+
+function SummaryTopicCard({ data }) {
+    const summary = data?.summary || "";
+    const proItems = Array.isArray(data?.pro_items) ? data.pro_items : [];
+    const conItems = Array.isArray(data?.con_items) ? data.con_items : [];
+
+    return (
+        <div className="report-item summary topic">
+            <div className="report-tag"><RiFileTextLine /> {data?.title || "토론 주제 요약"}</div>
+            {summary && <div className="report-content">{summary}</div>}
+            <div className="summary-topic-grid">
+                <div className="summary-topic-col pro">
+                    <div className="summary-topic-title">찬성측 입장 요약</div>
+                    {proItems.length === 0 ? (
+                        <div className="summary-topic-empty">내용 없음</div>
+                    ) : (
+                        <ol className="summary-list">
+                            {proItems.map((item, index) => (
+                                <li key={`topic-pro-${index}`}>{item}</li>
+                            ))}
+                        </ol>
+                    )}
+                </div>
+                <div className="summary-topic-col con">
+                    <div className="summary-topic-title">반대측 입장 요약</div>
+                    {conItems.length === 0 ? (
+                        <div className="summary-topic-empty">내용 없음</div>
+                    ) : (
+                        <ol className="summary-list">
+                            {conItems.map((item, index) => (
+                                <li key={`topic-con-${index}`}>{item}</li>
+                            ))}
+                        </ol>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function SummaryRoundCard({ data }) {
+    const title = data?.title || '라운드 요약';
+    const proItems = Array.isArray(data?.pro_items) ? data.pro_items : [];
+    const conItems = Array.isArray(data?.con_items) ? data.con_items : [];
+    return (
+        <div className="report-item summary round">
+            <div className="report-tag"><RiFileTextLine /> {title}</div>
+            <div className="summary-round-grid">
+                <div className="summary-round-col pro">
+                    <div className="summary-round-title">찬성측 입장 요약</div>
+                    {proItems.length === 0 ? (
+                        <div className="summary-round-empty">내용 없음</div>
+                    ) : (
+                        <ol className="summary-list">
+                            {proItems.map((item, index) => (
+                                <li key={`pro-${index}`}>{item}</li>
+                            ))}
+                        </ol>
+                    )}
+                </div>
+                <div className="summary-round-col con">
+                    <div className="summary-round-title">반대측 입장 요약</div>
+                    {conItems.length === 0 ? (
+                        <div className="summary-round-empty">내용 없음</div>
+                    ) : (
+                        <ol className="summary-list">
+                            {conItems.map((item, index) => (
+                                <li key={`con-${index}`}>{item}</li>
+                            ))}
+                        </ol>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function SummaryListCard({ title, items, tone }) {
+    const list = Array.isArray(items) ? items : [];
+    return (
+        <div className={`report-item summary list ${tone}`}>
+            <div className="report-tag"><RiFileTextLine /> {title || '입장 요약'}</div>
+            {list.length === 0 ? (
+                <div className="report-content">내용 없음</div>
+            ) : (
+                <ol className="summary-list">
+                    {list.map((item, index) => (
+                        <li key={`${tone}-${index}`}>{item}</li>
+                    ))}
+                </ol>
+            )}
+        </div>
+    );
+}
+
+function parsePersonalFeedback(content) {
+    if (!content) return null;
+    if (typeof content === 'object') return content;
+    if (typeof content === 'string') {
+        try {
+            return JSON.parse(content);
+        } catch (_) {
+            return null;
+        }
+    }
+    return null;
+}
+
+function PersonalFeedbackCard({ data }) {
+    if (!data) {
+        return (
+            <div className="report-item personal-feedback">
+                <div className="report-tag">개인 피드백</div>
+                <div className="report-content">피드백을 불러오지 못했습니다.</div>
+            </div>
+        );
+    }
+
+    if (data.message) {
+        return (
+            <div className="report-item personal-feedback">
+                <div className="report-tag">개인 피드백</div>
+                <div className="report-content">{data.message}</div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="report-item personal-feedback">
+            <div className="report-tag">개인 피드백</div>
+            {Array.isArray(data.strength) && data.strength.length > 0 && (
+                <div className="personal-feedback-section">
+                    <div className="personal-feedback-title">강점</div>
+                    <ul>
+                        {data.strength.map((item, index) => (
+                            <li key={`strength-${index}`}>{item}</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+            {Array.isArray(data.weakness) && data.weakness.length > 0 && (
+                <div className="personal-feedback-section">
+                    <div className="personal-feedback-title">보완할 점</div>
+                    <ul>
+                        {data.weakness.map((item, index) => (
+                            <li key={`weakness-${index}`}>{item}</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+            {Array.isArray(data.detailed_points) && data.detailed_points.length > 0 && (
+                <div className="personal-feedback-section">
+                    <div className="personal-feedback-title">발언별 코칭</div>
+                    <div className="personal-feedback-points">
+                        {data.detailed_points.slice(0, 3).map((point, index) => (
+                            <div key={`point-${index}`} className="personal-feedback-point">
+                                <div className="point-turn">턴 {point.turn}</div>
+                                <div className="point-original">{point.original_text}</div>
+                                <div className="point-critique">{point.critique}</div>
+                                <div className="point-suggestion">{point.suggestion}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+            {data.recommended_reading && (
+                <div className="personal-feedback-section">
+                    <div className="personal-feedback-title">추천 학습</div>
+                    <div className="personal-feedback-text">{data.recommended_reading}</div>
+                </div>
+            )}
         </div>
     );
 }

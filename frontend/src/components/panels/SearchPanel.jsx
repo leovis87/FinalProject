@@ -112,15 +112,23 @@ function SearchPanel({ isOpen, onClose }) {
         switch (status) {
             case 'waiting':
                 return { label: '대기 중', className: 'waiting' };
+            case 'proceeding':
+            case 'in_progress':
+                return { label: '진행 중', className: 'progress' };
             case 'in_progress_intro':
+            case 'intro':
                 return { label: '입론 중', className: 'progress' };
             case 'in_progress_rebuttal':
+            case 'rebuttal':
                 return { label: '반론 중', className: 'progress' };
             case 'in_progress_rerebuttal':
+            case 'rerebuttal':
                 return { label: '재반론 중', className: 'progress' };
             case 'in_progress_conclusion':
+            case 'conclusion':
                 return { label: '최종 발언', className: 'progress' };
             case 'in_progress_voting':
+            case 'voting':
                 return { label: '평가 중', className: 'voting' };
             case 'finished':
                 return { label: '종료', className: 'finished' };
@@ -132,8 +140,14 @@ function SearchPanel({ isOpen, onClose }) {
     const getLevelLabel = (level) => LEVEL_OPTIONS.find(opt => opt.id === level)?.label || level;
     const getCategoryLabel = (cat) => CATEGORY_OPTIONS.find(opt => opt.id === cat)?.label || cat;
 
+    if (!isOpen) {
+        return null;
+    }
+
     return (
-        <div className={`slide-panel-container ${isOpen ? 'open' : ''}`}>
+        <div className="search-modal-overlay">
+            <button type="button" className="search-modal-backdrop" onClick={onClose} aria-label="닫기" />
+            <div className="search-modal">
             {/* --- 헤더 영역 --- */}
             <div className="panel-header-area">
                 <div>
@@ -282,6 +296,7 @@ function SearchPanel({ isOpen, onClose }) {
                     onClose={() => setSelectedJoinRoom(null)} 
                 />
             )}
+            </div>
         </div>
     );
 }

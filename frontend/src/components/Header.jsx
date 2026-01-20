@@ -1,5 +1,5 @@
-import { Link, useNavigate } from "react-router-dom"
-import { RiVipCrown2Fill, RiUserLine } from "react-icons/ri";
+import { Link, useLocation, useNavigate } from "react-router-dom"
+import { RiVipCrown2Fill, RiUserLine, RiHomeLine } from "react-icons/ri";
 import { MdLogout } from "react-icons/md";
 import Logo from "./Logo"
 import { useAuth } from "../contexts/AuthContext"
@@ -7,6 +7,7 @@ import { useAuth } from "../contexts/AuthContext"
 function Header() {
     const { isAuthenticated, logout, user } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const handleLogout = () => {
         if (window.confirm("로그아웃 하시겠습니까?")) {
@@ -15,8 +16,9 @@ function Header() {
         }
     };
 
-    const handleGoMyPage = () => {
-        navigate("/mypage");
+    const isMyPage = location.pathname.startsWith("/mypage");
+    const handlePrimaryNav = () => {
+        navigate(isMyPage ? "/" : "/mypage");
     };
 
     return (
@@ -54,8 +56,8 @@ function Header() {
                         </div>
 
                         <div className="icon-actions">
-                            <button className="icon-btn" onClick={handleGoMyPage}>
-                                <RiUserLine size={24} />
+                            <button className="icon-btn" onClick={handlePrimaryNav}>
+                                {isMyPage ? <RiHomeLine size={24} /> : <RiUserLine size={24} />}
                             </button>
                             <button className="icon-btn" onClick={handleLogout}><MdLogout size={25} /></button>
                         </div>

@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import SearchPanel from "../components/panels/SearchPanel";
 import VerdictsPanel from "../components/panels/VerdictsPanel";
+import JoinRoomModal from "../components/modals/JoinRoomModal";
+import CreateRoomModal from "../components/modals/CreateRoomModal";
 import "../styles/HomePage.css";
 
 function HomePage() {
@@ -11,6 +13,14 @@ function HomePage() {
     const [isMatching, setIsMatching] = useState(false);
     const navigate = useNavigate();
     const [infoTab, setInfoTab] = useState("notice");
+    const [debateRooms, setDebateRooms] = useState([]);
+    const [isLoadingDebates, setIsLoadingDebates] = useState(false);
+    const [debateError, setDebateError] = useState("");
+    const [selectedJoinRoom, setSelectedJoinRoom] = useState(null);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [popularVerdicts, setPopularVerdicts] = useState([]);
+    const [isLoadingVerdicts, setIsLoadingVerdicts] = useState(false);
+    const [verdictError, setVerdictError] = useState("");
 
     const togglePanel = (panelName) => {
         if (activePanel === panelName) {
@@ -20,37 +30,95 @@ function HomePage() {
         }
     };
 
-    const availableDebates = [
-        {
-            id: "debate-1",
-            title: "최저임금 인상, 필요한가?",
-            tags: ["경제", "정책"],
-            participants: 3,
-            capacity: 4,
-            start: "3분 후 시작",
-            level: "LV.1~3 추천",
-        },
-        {
-            id: "debate-2",
-            title: "온라인 익명성은 보장되어야 하는가?",
-            tags: ["사회", "윤리"],
-            participants: 2,
-            capacity: 4,
-            start: "바로 시작",
-            level: "LV.2~4 추천",
-        },
-        {
-            id: "debate-3",
-            title: "플라스틱 규제, 어디까지?",
-            tags: ["환경", "정책"],
-            participants: 1,
-            capacity: 4,
-            start: "5분 후 시작",
-            level: "LV.1~2 추천",
-        },
-    ];
+    useEffect(() => {
+        const fetchDebates = async () => {
+            setIsLoadingDebates(true);
+            setDebateError("");
+            try {
+                const response = await fetch("http://localhost:8000/api/debates/");
+                if (!response.ok) {
+                    throw new Error("토론 목록을 불러오지 못했습니다.");
+                }
+                const data = await response.json();
+                setDebateRooms(Array.isArray(data) ? data : []);
+            } catch (error) {
+                setDebateError(error instanceof Error ? error.message : "토론 목록 로드 실패");
+            } finally {
+                setIsLoadingDebates(false);
+            }
+        };
+
+        fetchDebates();
+    }, []);
+
+    useEffect(() => {
+        const fetchVerdicts = async () => {
+            setIsLoadingVerdicts(true);
+            setVerdictError("");
+            try {
+                const token = localStorage.getItem("access_token");
+                const response = await fetch("http://localhost:8000/api/debates/verdicts/popular?limit=3", {
+                    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+                });
+                if (!response.ok) {
+                    throw new Error("인기 판결문을 불러오지 못했습니다.");
+                }
+                const data = await response.json();
+                setPopularVerdicts(Array.isArray(data) ? data : []);
+            } catch (error) {
+                setVerdictError(error instanceof Error ? error.message : "인기 판결문 로드 실패");
+            } finally {
+                setIsLoadingVerdicts(false);
+            }
+        };
+
+        fetchVerdicts();
+    }, []);
+
+    const levelLabelMap = {
+        all: "제한 없음",
+        elementary_low: "초등 (저)",
+        elementary_high: "초등 (고)",
+        middle: "중등",
+        high: "고등",
+    };
+
+    const categoryLabelMap = {
+        korean: "국어",
+        social: "사회",
+        moral: "도덕",
+        ethics: "윤리",
+    };
+
+    const getStartLabel = (status) => {
+        if (status === "waiting") return "대기 중";
+        if (status && status.startsWith("in_progress")) return "진행 중";
+        return "대기 중";
+    };
+
+    const eligibleDebates = debateRooms
+        .filter((room) => room.status !== "finished")
+        .sort((a, b) => {
+            const aTime = new Date(a.started_at || a.created_at || 0).getTime();
+            const bTime = new Date(b.started_at || b.created_at || 0).getTime();
+            return bTime - aTime;
+        });
+
+    const availableDebates = eligibleDebates.map((room) => ({
+        id: room.debate_room_id,
+        title: room.title,
+        tags: [
+            categoryLabelMap[room.category] || room.category || "기타",
+            levelLabelMap[room.level] || room.level || "수준 정보 없음",
+        ],
+        participants: room.current_users ?? room.participants?.length ?? 0,
+        capacity: room.max_users,
+        start: getStartLabel(room.status),
+        raw: room,
+    }));
+
     const featuredDebate = availableDebates[0];
-    const compactDebates = availableDebates.slice(1);
+    const compactDebates = availableDebates.slice(1, 6);
 
     // TODO: 대기열 상태 연결 시 queuedRoom에 데이터 주입
     const queuedRoom = null;
@@ -105,6 +173,15 @@ function HomePage() {
         runMatch();
     };
 
+    const handleJoinClick = (room) => {
+        const isParticipant = room.participants?.some((participant) => participant.user_id === user?.user_id);
+        if (isParticipant) {
+            navigate(`/debate/room/${room.debate_room_id}`);
+            return;
+        }
+        setSelectedJoinRoom(room);
+    };
+
     return (
         <div className="home-container">
             <div className="lobby-grid">
@@ -120,9 +197,12 @@ function HomePage() {
                         <button type="button" className="action-btn secondary" onClick={() => togglePanel("search")}>
                             토론 찾기
                         </button>
-                        {/* TODO: 친구와 방 만들기 기능 연결 */}
-                        <button type="button" className="action-btn link" disabled>
-                            친구와 방 만들기
+                        <button
+                            type="button"
+                            className="action-btn secondary"
+                            onClick={() => setIsCreateModalOpen(true)}
+                        >
+                            토론방 만들기
                         </button>
                     </section>
                 </aside>
@@ -155,11 +235,29 @@ function HomePage() {
                         </div>
                     )}
 
-                    {featuredDebate && (
+                    {isLoadingDebates && (
+                        <div className="card debate-card compact">
+                            <div className="debate-compact-main">
+                                <h4 className="debate-title">불러오는 중...</h4>
+                                <p className="section-desc">참여 가능한 토론을 준비하고 있어요.</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {!isLoadingDebates && debateError && (
+                        <div className="card debate-card compact">
+                            <div className="debate-compact-main">
+                                <h4 className="debate-title">목록을 불러오지 못했습니다.</h4>
+                                <p className="section-desc">{debateError}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {!isLoadingDebates && !debateError && featuredDebate && (
                         <article className="card debate-card compact featured">
                             <div className="debate-compact-main">
                                 <div className="debate-title-row">
-                                    <span className="featured-label">Featured</span>
+                                    <span className="featured-label">추천</span>
                                     <h3 className="debate-title">{featuredDebate.title}</h3>
                                 </div>
                                 <div className="tag-row">
@@ -178,9 +276,13 @@ function HomePage() {
                             </div>
                             <div className="debate-compact-actions">
                                 <span className="status-pill subtle">
-                                    {featuredDebate.start === "바로 시작" ? "바로 시작" : "대기 중"}
+                                    {featuredDebate.start === "진행 중" ? "진행 중" : "대기 중"}
                                 </span>
-                                <button type="button" className="action-btn secondary small">
+                                <button
+                                    type="button"
+                                    className="action-btn secondary small"
+                                    onClick={() => handleJoinClick(featuredDebate.raw)}
+                                >
                                     참여하기
                                 </button>
                             </div>
@@ -188,6 +290,15 @@ function HomePage() {
                     )}
 
                     <div className="debate-compact-list">
+                        {!isLoadingDebates && !debateError && availableDebates.length === 0 && (
+                            <div className="card debate-card compact">
+                                <div className="debate-compact-main">
+                                    <h4 className="debate-title">참여 가능한 토론이 없습니다.</h4>
+                                    <p className="section-desc">새로운 토론방을 만들어보세요.</p>
+                                </div>
+                            </div>
+                        )}
+
                         {compactDebates.map((debate) => (
                             <article key={debate.id} className="card debate-card compact">
                                 <div className="debate-compact-main">
@@ -210,9 +321,13 @@ function HomePage() {
                                 </div>
                                 <div className="debate-compact-actions">
                                     <span className="status-pill subtle">
-                                        {debate.start === "바로 시작" ? "바로 시작" : "대기 중"}
+                                        {debate.start === "진행 중" ? "진행 중" : "대기 중"}
                                     </span>
-                                    <button type="button" className="action-btn secondary small">
+                                    <button
+                                        type="button"
+                                        className="action-btn secondary small"
+                                        onClick={() => handleJoinClick(debate.raw)}
+                                    >
                                         참여하기
                                     </button>
                                 </div>
@@ -292,13 +407,39 @@ function HomePage() {
                                             더보기
                                         </button>
                                     </div>
-                                    <div className="verdict-item">
-                                        <span>청소년 스마트폰 제한, 필요한가?</span>
-                                        <span className="tag-pill">TOP</span>
-                                    </div>
-                                    <div className="verdict-item">
-                                        <span>원격근무 의무화의 장단점</span>
-                                    </div>
+                                    {isLoadingVerdicts && (
+                                        <div className="verdict-item">
+                                            <span>불러오는 중...</span>
+                                        </div>
+                                    )}
+                                    {!isLoadingVerdicts && verdictError && (
+                                        <div className="verdict-item">
+                                            <span>{verdictError}</span>
+                                        </div>
+                                    )}
+                                    {!isLoadingVerdicts && !verdictError && popularVerdicts.length === 0 && (
+                                        <div className="verdict-item">
+                                            <span>표시할 판결문이 없습니다.</span>
+                                        </div>
+                                    )}
+                                    {!isLoadingVerdicts && !verdictError && popularVerdicts.map((item, index) => (
+                                        <div
+                                            key={item.debate_room_id}
+                                            className="verdict-item clickable"
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() => togglePanel("verdicts")}
+                                            onKeyDown={(event) => {
+                                                if (event.key === "Enter" || event.key === " ") {
+                                                    event.preventDefault();
+                                                    togglePanel("verdicts");
+                                                }
+                                            }}
+                                        >
+                                            <span>{item.title}</span>
+                                            <span className="tag-pill">{index === 0 ? "TOP" : "HOT"}</span>
+                                        </div>
+                                    ))}
                                 </>
                             )}
                         </div>
@@ -308,6 +449,12 @@ function HomePage() {
 
             <SearchPanel isOpen={activePanel === "search"} onClose={() => setActivePanel(null)} />
             <VerdictsPanel isOpen={activePanel === "verdicts"} onClose={() => setActivePanel(null)} />
+            {selectedJoinRoom && (
+                <JoinRoomModal room={selectedJoinRoom} onClose={() => setSelectedJoinRoom(null)} />
+            )}
+            {isCreateModalOpen && (
+                <CreateRoomModal onClose={() => setIsCreateModalOpen(false)} />
+            )}
         </div>
     );
 }

@@ -122,6 +122,18 @@ class DebateVerdictResponse(BaseModel):
     best_player: Optional[str] = None
     decided_at: Optional[datetime] = None
 
+class PopularVerdictItem(BaseModel):
+    debate_room_id: int
+    title: str
+    topic: str
+    category: DebateCategory
+    level: DebateLevel
+    finished_at: Optional[datetime] = None
+    rating: float
+    pro_score: Optional[float] = None
+    con_score: Optional[float] = None
+    summary: Optional[str] = None
+
 class DebateResultItem(BaseModel):
     user_id: int
     result: DebateResult
