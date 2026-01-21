@@ -643,7 +643,7 @@ def _filter_messages_for_user(messages: List[dict], user_id: Optional[str]) -> L
     return filtered
 
 
-def _get_personal_feedbacks(room_state: dict) -> Dict[str, dict]:
+async def _get_personal_feedbacks(room_state: dict) -> Dict[str, dict]:
     state = _graph_base_state(room_state, include_premium=True)
     state["messages"] = list(room_state.get("dialogue_messages", []))
     config = _graph_config(f"debate_{room_state['room_id']}_personal")
@@ -651,14 +651,14 @@ def _get_personal_feedbacks(room_state: dict) -> Dict[str, dict]:
     feedbacks: Dict[str, dict] = {}
 
     try:
-        pro_result = debate_app.invoke(Command(update=state, goto="pro_feedback"), config)
+        pro_result = await debate_app.ainvoke(Command(update=state, goto="pro_feedback"), config)
         if isinstance(pro_result, dict):
             feedbacks.update(pro_result.get("premium_feedbacks", {}) or {})
     except Exception:
         traceback.print_exc()
 
     try:
-        con_result = debate_app.invoke(Command(update=state, goto="con_feedback"), config)
+        con_result = await debate_app.ainvoke(Command(update=state, goto="con_feedback"), config)
         if isinstance(con_result, dict):
             feedbacks.update(con_result.get("premium_feedbacks", {}) or {})
     except Exception:
@@ -732,19 +732,19 @@ async def _emit_loading_end(room_state: dict) -> None:
     )
 
 
-def _run_topic_summary(room_state: dict) -> Optional[dict]:
+async def _run_topic_summary(room_state: dict) -> Optional[dict]:
     state = _graph_base_state(room_state)
     config = _graph_config(f"debate_{room_state['room_id']}_topic")
-    result = debate_app.invoke(Command(update=state, goto="analyze_topic"), config)
+    result = await debate_app.ainvoke(Command(update=state, goto="analyze_topic"), config)
     return result.get("topic_analysis") if isinstance(result, dict) else None
 
 
-def _run_round_summary(room_state: dict, round_number: int) -> str:
+async def _run_round_summary(room_state: dict, round_number: int) -> str:
     state = _graph_base_state(room_state)
     state["current_turn"] = round_number
     state["messages"] = list(room_state["round_messages"].get(round_number, []))
     config = _graph_config(f"debate_{room_state['room_id']}_summary_{round_number}")
-    result = debate_app.invoke(Command(update=state, goto="summary"), config)
+    result = await debate_app.ainvoke(Command(update=state, goto="summary"), config)
     summary_history = []
     if isinstance(result, dict):
         summary_history = result.get("summary_history", [])
@@ -849,7 +849,7 @@ async def _complete_turn(
 
     try:
         await _emit_loading_message(room_state, "AI가 입력중입니다")
-        summary_text = _run_round_summary(room_state, round_number)
+        summary_text = await _run_round_summary(room_state, round_number)
         parts = _parse_round_summary(summary_text)
         if not parts:
             await _emit_system_message(room_state, summary_text)
@@ -922,14 +922,14 @@ async def _complete_turn(
 
 
 # 1. 기존의 _format_moderator_report는 삭제하고 이 함수를 추가하세요.
-def _get_final_report_data(room_state: dict) -> Optional[dict]:
+async def _get_final_report_data(room_state: dict) -> Optional[dict]:
     """사회자 최종 리포트 객체를 생성하고 JSON safe한 dict로 반환합니다."""
     state = _graph_base_state(room_state)
     state["messages"] = list(room_state.get("dialogue_messages", []))
     config = _graph_config(f"debate_{room_state['room_id']}_final")
     
     # LangGraph 실행 (moderator_shared 노드로 이동)
-    result = debate_app.invoke(Command(update=state, goto="moderator_shared"), config)
+    result = await debate_app.ainvoke(Command(update=state, goto="moderator_shared"), config)
     report = result.get("moderator_report") if isinstance(result, dict) else None
     
     # Pydantic 모델이나 객체를 JSON으로 보낼 수 있게 dict로 변환
@@ -946,7 +946,7 @@ async def _finalize_debate(room_state: dict, room_id_str: str, sid: Optional[str
     report_data = None
     try:
         await _emit_loading_message(room_state, "AI가 입력중입니다")
-        report_data = _get_final_report_data(room_state)
+        report_data = await _get_final_report_data(room_state)
         if report_data:
             await _emit_system_message(room_state, report_data.get("general_summary", ""), "report_summary")
             await _emit_system_message(room_state, report_data.get("pro_eval", {}), "report_pro")
@@ -960,7 +960,7 @@ async def _finalize_debate(room_state: dict, room_id_str: str, sid: Optional[str
         await _emit_loading_end(room_state)
 
     try:
-        personal_feedbacks = _get_personal_feedbacks(room_state)
+        personal_feedbacks = await _get_personal_feedbacks(room_state)
         if personal_feedbacks:
             for user_id, report in personal_feedbacks.items():
                 if not isinstance(report, dict):
@@ -1196,7 +1196,7 @@ async def handle_start(sid, data):
                     "토론 시작!\n친구의 생각에 귀를 기울이며 논리적인 대화를 나누어 보아요.",
                     "생각의 힘을 기르는 토론의 장이 마련되었습니다.\n서로 다른 의견이 만나 어떤 결론을 만들어낼지 기대하며 시작해 보겠습니다."
                 ]
-                num_msg = randint(0, len(start_msgs))
+                num_msg = randint(0, len(start_msgs) - 1)
                 await _emit_system_message(room_state, start_msgs[num_msg])
 
                 # Topic summary at debate start (LLM).
@@ -1205,7 +1205,7 @@ async def handle_start(sid, data):
                     graph_payload = _debug_payload("info", "GRAPH", room_id_str, str(user_id), "topic_summary start")
                     _debug_print(graph_payload, state=str(room.status))
                     await _emit_debug(graph_payload, room_id_str, sid=sid)
-                    topic_analysis = _run_topic_summary(room_state)
+                    topic_analysis = await _run_topic_summary(room_state)
                     room_state["topic_analysis"] = topic_analysis
                     parts = _format_topic_analysis_parts(topic_analysis)
                     if not parts:
