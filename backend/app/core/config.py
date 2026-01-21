@@ -44,6 +44,7 @@ class Settings(BaseSettings):
 
         env_file = os.path.join(backend_dir, ".env")
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
 @lru_cache()
 def get_settings() -> Settings:
