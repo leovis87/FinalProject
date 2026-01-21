@@ -27,9 +27,12 @@ function MyPage() {
     const [verdictError, setVerdictError] = useState("");
     const [verdictData, setVerdictData] = useState(null);
     const [verdictMeta, setVerdictMeta] = useState(null);
-    const [feedbackStatus, setFeedbackStatus] = useState("idle");
-    const [feedbackError, setFeedbackError] = useState("");
-    const [feedbackData, setFeedbackData] = useState(null);
+    const [personalStatus, setPersonalStatus] = useState("idle");
+    const [personalError, setPersonalError] = useState("");
+    const [personalFeedbacks, setPersonalFeedbacks] = useState([]);
+    const [personalQuery, setPersonalQuery] = useState("");
+    const [personalOpen, setPersonalOpen] = useState(false);
+    const [personalTarget, setPersonalTarget] = useState(null);
 
     const mockProfile = useMemo(() => ({
         nickname: user?.nickname || "Guest",
@@ -166,45 +169,74 @@ function MyPage() {
     useEffect(() => {
         const token = localStorage.getItem("access_token");
         if (!token || historyRecords.length === 0) {
-            setFeedbackStatus("idle");
-            setFeedbackData(null);
+            setPersonalStatus("idle");
+            setPersonalFeedbacks([]);
             return;
         }
 
-        const latest = historyRecords[0];
         let isMounted = true;
 
-        const fetchFeedback = async () => {
-            setFeedbackStatus("loading");
-            setFeedbackError("");
+        const parseReportPayload = (content) => {
+            if (!content) return null;
+            if (typeof content === "object") return content;
+            if (typeof content !== "string") return null;
             try {
-                const response = await fetch(`http://localhost:8000/api/debates/${latest.id}/verdict`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
-                if (!response.ok) {
-                    throw new Error("AI 피드백을 불러오지 못했습니다.");
-                }
-                const data = await response.json();
-                if (isMounted) {
-                    setFeedbackData({
-                        topic: latest.title,
-                        summary: data.summary || "",
-                        proEval: data.pro_eval || null,
-                        conEval: data.con_eval || null,
+                return JSON.parse(content);
+            } catch (error) {
+                return { rawText: content };
+            }
+        };
+
+        const fetchPersonalFeedbacks = async () => {
+            setPersonalStatus("loading");
+            setPersonalError("");
+            try {
+                const results = await Promise.all(historyRecords.map(async (record) => {
+                    const response = await fetch(`http://localhost:8000/api/debates/${record.id}/messages`, {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
                     });
-                    setFeedbackStatus("success");
+                    if (!response.ok) {
+                        return [];
+                    }
+                    const data = await response.json();
+                    const messages = Array.isArray(data) ? data : [];
+                    return messages
+                        .filter((msg) => msg.display_type === "report_user")
+                        .map((msg) => ({
+                            id: msg.message_id ?? `${record.id}-${msg.turn || "report"}`,
+                            debateId: record.id,
+                            title: record.title,
+                            date: record.date,
+                            rawDate: record.rawDate,
+                            role: record.role,
+                            result: record.result,
+                            createdAt: msg.created_at,
+                            report: parseReportPayload(msg.content),
+                        }));
+                }));
+
+                if (isMounted) {
+                    const flattened = results.flat();
+                    const sorted = flattened.sort((a, b) => {
+                        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                        return timeB - timeA;
+                    });
+                    setPersonalFeedbacks(sorted);
+                    setPersonalStatus("success");
                 }
             } catch (error) {
                 if (isMounted) {
-                    setFeedbackStatus("error");
-                    setFeedbackError(error?.message || "AI 피드백을 불러오지 못했습니다.");
+                    setPersonalFeedbacks([]);
+                    setPersonalStatus("error");
+                    setPersonalError(error?.message || "개인 피드백을 불러오지 못했습니다.");
                 }
             }
         };
 
-        fetchFeedback();
+        fetchPersonalFeedbacks();
 
         return () => {
             isMounted = false;
@@ -310,9 +342,15 @@ function MyPage() {
                 historyError={historyError}
                 onReplay={handleOpenReplay}
                 onVerdict={handleOpenVerdict}
-                feedbackStatus={feedbackStatus}
-                feedbackError={feedbackError}
-                feedbackData={feedbackData}
+                personalFeedbacks={personalFeedbacks}
+                personalStatus={personalStatus}
+                personalError={personalError}
+                personalQuery={personalQuery}
+                onPersonalQueryChange={setPersonalQuery}
+                onOpenPersonal={(item) => {
+                    setPersonalTarget(item);
+                    setPersonalOpen(true);
+                }}
                 badges={badges}
                 nickname={mockProfile.nickname}
             />
@@ -332,6 +370,15 @@ function MyPage() {
                     error={verdictError}
                     verdict={verdictData}
                     onClose={handleCloseVerdict}
+                />
+            )}
+            {personalOpen && (
+                <PersonalFeedbackModal
+                    item={personalTarget}
+                    onClose={() => {
+                        setPersonalOpen(false);
+                        setPersonalTarget(null);
+                    }}
                 />
             )}
         </MyPageLayout>
@@ -398,9 +445,12 @@ function ActivityTabs({
     historyError,
     onReplay,
     onVerdict,
-    feedbackStatus,
-    feedbackError,
-    feedbackData,
+    personalFeedbacks,
+    personalStatus,
+    personalError,
+    personalQuery,
+    onPersonalQueryChange,
+    onOpenPersonal,
     badges,
     nickname
 }) {
@@ -445,9 +495,12 @@ function ActivityTabs({
                         activityData={activityData}
                         recentDebates={recentDebates}
                         onVerdict={onVerdict}
-                        feedbackStatus={feedbackStatus}
-                        feedbackError={feedbackError}
-                        feedbackData={feedbackData}
+                        personalFeedbacks={personalFeedbacks}
+                        personalStatus={personalStatus}
+                        personalError={personalError}
+                        personalQuery={personalQuery}
+                        onPersonalQueryChange={onPersonalQueryChange}
+                        onOpenPersonal={onOpenPersonal}
                     />
                 )}
                 {activeTab === "history" && (
@@ -466,30 +519,63 @@ function ActivityTabs({
     );
 }
 
-function ActivitySummaryTab({ activityData, recentDebates, onVerdict, feedbackStatus, feedbackError, feedbackData }) {
-    const pickHighlights = (evalData) => {
-        if (!evalData?.scores) return null;
-        const labels = {
-            clarity: "주장 명확성",
-            evidence: "근거 적합성",
-            interaction: "상호작용",
-            attitude: "태도",
-        };
-        const entries = Object.entries(evalData.scores)
-            .map(([key, value]) => ({ key, label: labels[key] || key, value }))
-            .filter((item) => item.value !== undefined && item.value !== null);
-        if (!entries.length) return null;
-        const sorted = [...entries].sort((a, b) => b.value - a.value);
-        return {
-            strength: sorted[0],
-            improvement: sorted[sorted.length - 1],
-        };
+function ActivitySummaryTab({
+    activityData,
+    recentDebates,
+    onVerdict,
+    personalFeedbacks,
+    personalStatus,
+    personalError,
+    personalQuery,
+    onPersonalQueryChange,
+    onOpenPersonal
+}) {
+    const buildSummaryText = (report) => {
+        if (!report) return "피드백 요약이 없습니다.";
+        if (Array.isArray(report.strength) && report.strength.length > 0) {
+            return `강점: ${report.strength[0]}`;
+        }
+        if (Array.isArray(report.weakness) && report.weakness.length > 0) {
+            return `개선: ${report.weakness[0]}`;
+        }
+        if (report.recommended_reading) {
+            return `추천: ${report.recommended_reading}`;
+        }
+        if (report.rawText) {
+            return report.rawText;
+        }
+        return "피드백 요약이 없습니다.";
     };
 
-    const highlight = feedbackData?.proEval || feedbackData?.conEval ? {
-        pro: pickHighlights(feedbackData?.proEval),
-        con: pickHighlights(feedbackData?.conEval),
-    } : null;
+    const buildSearchText = (item) => {
+        const report = item?.report || {};
+        const parts = [
+            item?.title,
+            item?.date,
+            item?.role,
+            item?.result,
+            ...(Array.isArray(report.strength) ? report.strength : []),
+            ...(Array.isArray(report.weakness) ? report.weakness : []),
+            report.recommended_reading,
+            report.rawText,
+        ];
+
+        if (Array.isArray(report.detailed_points)) {
+            report.detailed_points.forEach((point) => {
+                parts.push(point?.original_text);
+                parts.push(point?.critique);
+                parts.push(point?.suggestion);
+            });
+        }
+
+        return parts.filter(Boolean).join(" ").toLowerCase();
+    };
+
+    const filteredPersonalFeedbacks = useMemo(() => {
+        if (!personalQuery) return personalFeedbacks;
+        const query = personalQuery.toLowerCase();
+        return personalFeedbacks.filter((item) => buildSearchText(item).includes(query));
+    }, [personalFeedbacks, personalQuery]);
 
     return (
         <div className="summary-grid">
@@ -549,48 +635,67 @@ function ActivitySummaryTab({ activityData, recentDebates, onVerdict, feedbackSt
                 </div>
             </div>
 
-            <div className="summary-feedback">
-                <div className="section-title">
-                    <h3>AI 피드백</h3>
-                    <span className="section-desc">최근 토론 요약</span>
-                </div>
-                {feedbackStatus === "loading" && (
-                    <div className="summary-feedback-state">피드백을 불러오는 중...</div>
-                )}
-                {feedbackStatus === "error" && (
-                    <div className="summary-feedback-state error">{feedbackError}</div>
-                )}
-                {feedbackStatus === "success" && feedbackData && (
-                    <div className="summary-feedback-content">
-                        <div className="summary-feedback-header">
-                            <strong>{feedbackData.topic}</strong>
-                            {feedbackData.summary && <p>{feedbackData.summary}</p>}
-                        </div>
-                        {highlight && (
-                            <div className="summary-feedback-grid">
-                                {highlight.pro && (
-                                    <div className="summary-feedback-card">
-                                        <span>찬성팀</span>
-                                        <p>강점: {highlight.pro.strength.label} {highlight.pro.strength.value}점</p>
-                                        <p>개선: {highlight.pro.improvement.label} {highlight.pro.improvement.value}점</p>
-                                    </div>
-                                )}
-                                {highlight.con && (
-                                    <div className="summary-feedback-card">
-                                        <span>반대팀</span>
-                                        <p>강점: {highlight.con.strength.label} {highlight.con.strength.value}점</p>
-                                        <p>개선: {highlight.con.improvement.label} {highlight.con.improvement.value}점</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        <div className="summary-feedback-action">
-                            다음 토론에서는 낮은 항목을 우선 개선해보세요.
-                        </div>
+            <div className="summary-feedback personal-feedback">
+                <div className="section-title personal-feedback-header">
+                    <div>
+                        <h3>개인 피드백</h3>
+                        <span className="section-desc">토론별 개인 코칭 리포트</span>
                     </div>
+                    <div className="personal-feedback-search">
+                        <input
+                            type="text"
+                            placeholder="피드백 검색"
+                            value={personalQuery}
+                            onChange={(event) => onPersonalQueryChange?.(event.target.value)}
+                        />
+                    </div>
+                </div>
+                {personalStatus === "loading" && (
+                    <div className="summary-feedback-state">개인 피드백을 불러오는 중...</div>
                 )}
-                {feedbackStatus === "idle" && (
-                    <div className="summary-feedback-state">표시할 피드백이 없습니다.</div>
+                {personalStatus === "error" && (
+                    <div className="summary-feedback-state error">{personalError}</div>
+                )}
+                {personalStatus !== "loading" && personalStatus !== "error" && filteredPersonalFeedbacks.length === 0 && (
+                    <div className="summary-feedback-state">표시할 개인 피드백이 없습니다.</div>
+                )}
+                {personalStatus === "success" && filteredPersonalFeedbacks.length > 0 && (
+                    <div className="personal-feedback-list">
+                        {filteredPersonalFeedbacks.map((item) => (
+                            <button
+                                key={item.id}
+                                type="button"
+                                className="personal-feedback-item"
+                                onClick={() => onOpenPersonal?.(item)}
+                            >
+                                <div className="personal-feedback-main">
+                                    <strong>{item.title}</strong>
+                                    <span className="personal-feedback-snippet">
+                                        {buildSummaryText(item.report)}
+                                    </span>
+                                </div>
+                                <div className="personal-feedback-meta">
+                                    <span>{item.date || "-"}</span>
+                                    <div className="personal-feedback-badges">
+                                        <span className={`feedback-badge role ${item.role === "찬성" ? "pro" : item.role === "반대" ? "con" : "observer"}`}>
+                                            {item.role || "-"}
+                                        </span>
+                                        <span className={`feedback-badge result ${
+                                            item.result === "승리"
+                                                ? "win"
+                                                : item.result === "패배"
+                                                    ? "lose"
+                                                    : item.result === "무승부"
+                                                        ? "draw"
+                                                        : "pending"
+                                        }`}>
+                                            {item.result || "-"}
+                                        </span>
+                                    </div>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
                 )}
             </div>
         </div>
@@ -670,8 +775,24 @@ function HistoryTab({ historyRecords, historyStatus, historyError, onReplay, onV
                             <strong>{record.title}</strong>
                             <span>{record.date}</span>
                         </div>
-                        <span className="history-meta">{record.role}</span>
-                        <span className="history-meta">{record.result}</span>
+                        <div className="history-meta">
+                            <span className={`feedback-badge role ${record.role === "찬성" ? "pro" : record.role === "반대" ? "con" : "observer"}`}>
+                                {record.role}
+                            </span>
+                        </div>
+                        <div className="history-meta">
+                            <span className={`feedback-badge result ${
+                                record.result === "승리"
+                                    ? "win"
+                                    : record.result === "패배"
+                                        ? "lose"
+                                        : record.result === "무승부"
+                                            ? "draw"
+                                            : "pending"
+                            }`}>
+                                {record.result}
+                            </span>
+                        </div>
                         <div className="history-actions">
                             <button
                                 type="button"
@@ -768,6 +889,38 @@ function ReplayModal({ record, status, error, messages, onClose }) {
         return null;
     };
 
+    const hasPersonalKeys = (data) => {
+        if (!data || typeof data !== "object") return false;
+        return (
+            "strength" in data ||
+            "weakness" in data ||
+            "detailed_points" in data ||
+            "recommended_reading" in data ||
+            "message" in data
+        );
+    };
+
+    const parsePersonalPayload = (msg) => {
+        if (!msg) return null;
+        const raw = msg.content;
+        const isPersonalType = msg.display_type === "report_user";
+        if (raw && typeof raw === "object") {
+            if (isPersonalType || hasPersonalKeys(raw)) return raw;
+            return null;
+        }
+        if (typeof raw === "string") {
+            try {
+                const data = JSON.parse(raw);
+                if (!data || typeof data !== "object") return null;
+                if (isPersonalType || hasPersonalKeys(data)) return data;
+            } catch (_) {
+                if (isPersonalType) return { rawText: raw };
+                return null;
+            }
+        }
+        return null;
+    };
+
     const renderSummaryCard = (data) => {
         if (!data) return null;
         const proItems = Array.isArray(data.pro_items) ? data.pro_items : [];
@@ -808,6 +961,91 @@ function ReplayModal({ record, status, error, messages, onClose }) {
                             )}
                         </div>
                     </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderPersonalFeedbackCard = (data, msg) => {
+        if (!data) return null;
+        const strengths = Array.isArray(data.strength) ? data.strength : [];
+        const weaknesses = Array.isArray(data.weakness) ? data.weakness : [];
+        const details = Array.isArray(data.detailed_points) ? data.detailed_points : [];
+
+        return (
+            <div className="replay-message replay-personal">
+                <div className="replay-message-head">
+                    <span className="replay-role">개인 피드백</span>
+                    <span className="replay-time">{msg?.turn ? `Turn ${msg.turn}` : "-"}</span>
+                </div>
+                <div className="replay-personal-card">
+                    {data.message && <p className="replay-personal-text">{data.message}</p>}
+                    {!data.message && (
+                        <>
+                            <div className="personal-feedback-section">
+                                <h3>강점</h3>
+                                {strengths.length > 0 ? (
+                                    <ul>
+                                        {strengths.map((item, index) => (
+                                            <li key={`replay-strength-${index}`}>{item}</li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p>강점 정보가 없습니다.</p>
+                                )}
+                            </div>
+                            <div className="personal-feedback-section">
+                                <h3>개선 포인트</h3>
+                                {weaknesses.length > 0 ? (
+                                    <ul>
+                                        {weaknesses.map((item, index) => (
+                                            <li key={`replay-weakness-${index}`}>{item}</li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p>개선 포인트가 없습니다.</p>
+                                )}
+                            </div>
+                            <div className="personal-feedback-section">
+                                <h3>세부 코칭</h3>
+                                {details.length > 0 ? (
+                                    <div className="personal-feedback-detail-list">
+                                        {details.map((detail, index) => (
+                                            <div key={`replay-detail-${index}`} className="personal-feedback-detail">
+                                                <div className="personal-feedback-detail-head">
+                                                    <strong>Turn {detail.turn ?? "-"}</strong>
+                                                    <span>{detail.original_text || "발언 기록 없음"}</span>
+                                                </div>
+                                                {detail.critique && (
+                                                    <p className="personal-feedback-detail-text">
+                                                        피드백: {detail.critique}
+                                                    </p>
+                                                )}
+                                                {detail.suggestion && (
+                                                    <p className="personal-feedback-detail-text">
+                                                        제안: {detail.suggestion}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p>세부 코칭이 없습니다.</p>
+                                )}
+                            </div>
+                            {data.recommended_reading && (
+                                <div className="personal-feedback-section highlight">
+                                    추천 학습: <strong>{data.recommended_reading}</strong>
+                                </div>
+                            )}
+                            {data.rawText && (
+                                <div className="personal-feedback-section">
+                                    <h3>원문</h3>
+                                    <p>{data.rawText}</p>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </div>
             </div>
         );
@@ -949,6 +1187,14 @@ function ReplayModal({ record, status, error, messages, onClose }) {
                                                     <p>{aiEval.fact_check_result}</p>
                                                 </div>
                                             )}
+                                        </div>
+                                    );
+                                }
+                                const personalPayload = parsePersonalPayload(msg);
+                                if (personalPayload) {
+                                    return (
+                                        <div key={msg.message_id}>
+                                            {renderPersonalFeedbackCard(personalPayload, msg)}
                                         </div>
                                     );
                                 }
@@ -1144,6 +1390,107 @@ function VerdictTeamStack({ title, tone, totalScore, scores, feedback, factCheck
                     <p>{factCheck}</p>
                 </div>
             )}
+        </div>
+    );
+}
+
+function PersonalFeedbackModal({ item, onClose }) {
+    const report = item?.report || null;
+    const strengths = Array.isArray(report?.strength) ? report.strength : [];
+    const weaknesses = Array.isArray(report?.weakness) ? report.weakness : [];
+    const details = Array.isArray(report?.detailed_points) ? report.detailed_points : [];
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content personal-feedback-modal" onClick={(event) => event.stopPropagation()}>
+                <button type="button" className="modal-close-btn" onClick={onClose} aria-label="닫기">
+                    ×
+                </button>
+                <div className="personal-feedback-modal-header">
+                    <h2>개인 피드백</h2>
+                    <div className="personal-feedback-modal-meta">
+                        <span>{item?.title || "토론 제목 없음"}</span>
+                        <span>{item?.date || "-"}</span>
+                        <span>{item?.role || "-"}</span>
+                        <span>{item?.result || "-"}</span>
+                    </div>
+                </div>
+
+                {!report && (
+                    <div className="personal-feedback-empty">피드백 내용을 불러오지 못했습니다.</div>
+                )}
+
+                {report && (
+                    <div className="personal-feedback-modal-body">
+                        <div className="personal-feedback-section">
+                            <h3>강점</h3>
+                            {strengths.length > 0 ? (
+                                <ul>
+                                    {strengths.map((strength, index) => (
+                                        <li key={`strength-${index}`}>{strength}</li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p>강점 정보가 없습니다.</p>
+                            )}
+                        </div>
+
+                        <div className="personal-feedback-section">
+                            <h3>개선 포인트</h3>
+                            {weaknesses.length > 0 ? (
+                                <ul>
+                                    {weaknesses.map((weakness, index) => (
+                                        <li key={`weakness-${index}`}>{weakness}</li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p>개선 포인트가 없습니다.</p>
+                            )}
+                        </div>
+
+                        <div className="personal-feedback-section">
+                            <h3>세부 코칭</h3>
+                            {details.length > 0 ? (
+                                <div className="personal-feedback-detail-list">
+                                    {details.map((detail, index) => (
+                                        <div key={`detail-${index}`} className="personal-feedback-detail">
+                                            <div className="personal-feedback-detail-head">
+                                                <strong>Turn {detail.turn ?? "-"}</strong>
+                                                <span>{detail.original_text || "발언 기록 없음"}</span>
+                                            </div>
+                                            {detail.critique && (
+                                                <p className="personal-feedback-detail-text">
+                                                    피드백: {detail.critique}
+                                                </p>
+                                            )}
+                                            {detail.suggestion && (
+                                                <p className="personal-feedback-detail-text">
+                                                    제안: {detail.suggestion}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p>세부 코칭이 없습니다.</p>
+                            )}
+                        </div>
+
+                        {report.recommended_reading && (
+                            <div className="personal-feedback-section highlight">
+                                추천 학습: <strong>{report.recommended_reading}</strong>
+                            </div>
+                        )}
+
+                        {report.rawText && (
+                            <div className="personal-feedback-section">
+                                <h3>원문</h3>
+                                <p>{report.rawText}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

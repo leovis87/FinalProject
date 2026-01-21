@@ -21,7 +21,7 @@ import "../styles/DebatePage.css";
 function DebatePage() {
     const { roomId } = useParams();
     const navigate = useNavigate();
-    const { user: currentUser } = useAuth();
+    const { user: currentUser, refreshUser } = useAuth();
     
     const [room, setRoom] = useState(null);
     const [error, setError] = useState("");
@@ -80,7 +80,7 @@ function DebatePage() {
 
     // 2. Socket.io 실시간 통신 설정
     useEffect(() => {
-        if (!roomId || !currentUser) return;
+        if (!currentUser?.user_id || socketRef.current) return;
 
         const socket = io("http://localhost:8000", {
             path: "/socket.io",
@@ -90,10 +90,6 @@ function DebatePage() {
 
         socket.on("connect", () => {
             console.log("✅ 토론 서버 연결:", socket.id);
-            socket.emit("join_debate", { 
-                room_id: roomId,
-                user_id: currentUser.user_id 
-            });
         });
 
         socket.on("debate_started", () => {
@@ -103,7 +99,7 @@ function DebatePage() {
         // 서버의 debate_update 이벤트 처리
         socket.on("debate_update", (data) => {
             console.log("📩 실시간 업데이트:", data);
-            
+
             // ⭐ [해결] 발언권 문제 해결: 업데이트 데이터가 오고 라운드가 1 이상이면 토론 진행 중으로 간주
             if (data.current_round > 0) {
                 setDebateStarted(true);
@@ -176,14 +172,41 @@ function DebatePage() {
 
         socket.on("debate_ended", () => {
             setDebateEnded(true);
+            refreshUser?.();
         });
 
         socket.on("error", (err) => {
             alert(err.message);
         });
 
-        return () => socket.disconnect();
-    }, [roomId, currentUser]);
+        return () => {
+            socket.disconnect();
+            socketRef.current = null;
+        };
+    }, [currentUser?.user_id, refreshUser]);
+
+    useEffect(() => {
+        const socket = socketRef.current;
+        if (!socket || !roomId || !currentUser?.user_id) return;
+
+        const payload = { room_id: roomId, user_id: currentUser.user_id };
+        const handleConnect = () => {
+            socket.emit("join_debate", payload);
+        };
+
+        if (socket.connected) {
+            handleConnect();
+        } else {
+            socket.on("connect", handleConnect);
+        }
+
+        return () => {
+            socket.off("connect", handleConnect);
+            if (socket.connected) {
+                socket.emit("leave_debate", payload);
+            }
+        };
+    }, [roomId, currentUser?.user_id]);
 
     // 새 메시지 올 때마다 자동 스크롤
     useEffect(() => {

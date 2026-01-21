@@ -29,6 +29,13 @@ export function AuthProvider({ children }) {
         }
     }, []);
 
+    const refreshUser = useCallback(() => {
+        const token = localStorage.getItem("access_token");
+        if (token) {
+            fetchMe(token);
+        }
+    }, [fetchMe]);
+
     useEffect(() => {
         const token = localStorage.getItem("access_token");
         if (token) {
@@ -56,7 +63,7 @@ export function AuthProvider({ children }) {
     }
 
     return (
-        <AuthContext.Provider value={{ isAuthenticated, user, isLoading, login, logout, updateLocalNickname }}>
+        <AuthContext.Provider value={{ isAuthenticated, user, isLoading, login, logout, updateLocalNickname, refreshUser }}>
             {!isLoading && children}
         </AuthContext.Provider>
     );
