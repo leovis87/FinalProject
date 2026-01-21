@@ -889,6 +889,38 @@ function ReplayModal({ record, status, error, messages, onClose }) {
         return null;
     };
 
+    const hasPersonalKeys = (data) => {
+        if (!data || typeof data !== "object") return false;
+        return (
+            "strength" in data ||
+            "weakness" in data ||
+            "detailed_points" in data ||
+            "recommended_reading" in data ||
+            "message" in data
+        );
+    };
+
+    const parsePersonalPayload = (msg) => {
+        if (!msg) return null;
+        const raw = msg.content;
+        const isPersonalType = msg.display_type === "report_user";
+        if (raw && typeof raw === "object") {
+            if (isPersonalType || hasPersonalKeys(raw)) return raw;
+            return null;
+        }
+        if (typeof raw === "string") {
+            try {
+                const data = JSON.parse(raw);
+                if (!data || typeof data !== "object") return null;
+                if (isPersonalType || hasPersonalKeys(data)) return data;
+            } catch (_) {
+                if (isPersonalType) return { rawText: raw };
+                return null;
+            }
+        }
+        return null;
+    };
+
     const renderSummaryCard = (data) => {
         if (!data) return null;
         const proItems = Array.isArray(data.pro_items) ? data.pro_items : [];
@@ -929,6 +961,91 @@ function ReplayModal({ record, status, error, messages, onClose }) {
                             )}
                         </div>
                     </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderPersonalFeedbackCard = (data, msg) => {
+        if (!data) return null;
+        const strengths = Array.isArray(data.strength) ? data.strength : [];
+        const weaknesses = Array.isArray(data.weakness) ? data.weakness : [];
+        const details = Array.isArray(data.detailed_points) ? data.detailed_points : [];
+
+        return (
+            <div className="replay-message replay-personal">
+                <div className="replay-message-head">
+                    <span className="replay-role">개인 피드백</span>
+                    <span className="replay-time">{msg?.turn ? `Turn ${msg.turn}` : "-"}</span>
+                </div>
+                <div className="replay-personal-card">
+                    {data.message && <p className="replay-personal-text">{data.message}</p>}
+                    {!data.message && (
+                        <>
+                            <div className="personal-feedback-section">
+                                <h3>강점</h3>
+                                {strengths.length > 0 ? (
+                                    <ul>
+                                        {strengths.map((item, index) => (
+                                            <li key={`replay-strength-${index}`}>{item}</li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p>강점 정보가 없습니다.</p>
+                                )}
+                            </div>
+                            <div className="personal-feedback-section">
+                                <h3>개선 포인트</h3>
+                                {weaknesses.length > 0 ? (
+                                    <ul>
+                                        {weaknesses.map((item, index) => (
+                                            <li key={`replay-weakness-${index}`}>{item}</li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p>개선 포인트가 없습니다.</p>
+                                )}
+                            </div>
+                            <div className="personal-feedback-section">
+                                <h3>세부 코칭</h3>
+                                {details.length > 0 ? (
+                                    <div className="personal-feedback-detail-list">
+                                        {details.map((detail, index) => (
+                                            <div key={`replay-detail-${index}`} className="personal-feedback-detail">
+                                                <div className="personal-feedback-detail-head">
+                                                    <strong>Turn {detail.turn ?? "-"}</strong>
+                                                    <span>{detail.original_text || "발언 기록 없음"}</span>
+                                                </div>
+                                                {detail.critique && (
+                                                    <p className="personal-feedback-detail-text">
+                                                        피드백: {detail.critique}
+                                                    </p>
+                                                )}
+                                                {detail.suggestion && (
+                                                    <p className="personal-feedback-detail-text">
+                                                        제안: {detail.suggestion}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p>세부 코칭이 없습니다.</p>
+                                )}
+                            </div>
+                            {data.recommended_reading && (
+                                <div className="personal-feedback-section highlight">
+                                    추천 학습: <strong>{data.recommended_reading}</strong>
+                                </div>
+                            )}
+                            {data.rawText && (
+                                <div className="personal-feedback-section">
+                                    <h3>원문</h3>
+                                    <p>{data.rawText}</p>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </div>
             </div>
         );
@@ -1070,6 +1187,14 @@ function ReplayModal({ record, status, error, messages, onClose }) {
                                                     <p>{aiEval.fact_check_result}</p>
                                                 </div>
                                             )}
+                                        </div>
+                                    );
+                                }
+                                const personalPayload = parsePersonalPayload(msg);
+                                if (personalPayload) {
+                                    return (
+                                        <div key={msg.message_id}>
+                                            {renderPersonalFeedbackCard(personalPayload, msg)}
                                         </div>
                                     );
                                 }

@@ -600,6 +600,22 @@
     background: #fffbeb;
 }
 
+.replay-message.replay-personal {
+    border-color: #bfdbfe;
+    background: #f6fbff;
+}
+
+.replay-personal-card {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.replay-personal-text {
+    color: #1f2937;
+    font-weight: 600;
+}
+
 .replay-eval-summary {
     display: flex;
     flex-direction: column;

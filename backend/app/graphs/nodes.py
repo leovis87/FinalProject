@@ -517,8 +517,14 @@ def analyze_topic_node(state: DebateState,
 
         # 7. 🏗️ 구조화 (Formatting)
         logger.info("구조화(Formatting) 진행 중...")
+        logger.info(f"[구조화 입력 길이] {len(text_output)} chars")
 
-        final_obj: TopicBriefing = structuring_llm.invoke(text_output)
+        try:
+            final_obj: TopicBriefing = structuring_llm.invoke(text_output)
+        except Exception as e:
+            logger.error(f"⚠️ 구조화 실패: {e}")
+            logger.error(f"[구조화 입력 미리보기] {text_output[:300]}")
+            raise
 
         logger.info(f"구조화 완료 객체: {final_obj}")
 
@@ -743,12 +749,13 @@ def summary_node(state: DebateState,
 
     try:
         # 5. LLM 요약 생성
-        response = llm_g_real_non_harm.invoke(msg_list,
-                                              config = run_config)
-        
+        response = llm_g_real_non_harm.invoke(
+            msg_list,
+            config=run_config
+        )
+
         summary_result = _parse_agent_output(response.content)
         logger.info(f"\n📄 [요약 완료]\n{summary_result}")
-    
     except Exception as e:
         logger.error(f"⚠️ 요약 생성 실패: {e}")
         summary_result = f"[Turn {current_turn}] 요약 실패 (Error Occurred)"

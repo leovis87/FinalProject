@@ -319,7 +319,7 @@ def _graph_base_state(room_state: dict, include_premium: bool = False) -> dict:
 
 
 def _format_topic_analysis_parts(topic_analysis) -> Optional[dict]:
-    if not topic_analysis:
+    if topic_analysis is None:
         return None
     if hasattr(topic_analysis, "model_dump"):
         data = topic_analysis.model_dump()
@@ -479,7 +479,7 @@ def _needs_selection(room_state: dict, round_number: int) -> bool:
     return len(room_state.get("pro_users", [])) > 1 or len(room_state.get("con_users", [])) > 1
 
 
-def _start_selection_phase(room_state: dict, room_id_str: str, round_number: int) -> None:
+async def _start_selection_phase(room_state: dict, room_id_str: str, round_number: int) -> None:
     _cancel_turn_timer(room_id_str)
     _cancel_selection_timer(room_id_str)
     _prepare_round(room_state, round_number)
@@ -490,6 +490,11 @@ def _start_selection_phase(room_state: dict, room_id_str: str, round_number: int
     room_state["selection_round"] = round_number
     room_state["selection_deadline"] = datetime.now(timezone.utc) + timedelta(seconds=SELECTION_TIMEOUT_SEC)
     room_state["selection_requests"] = {"pro": set(), "con": set()}
+
+    await _emit_system_message(
+        room_state,
+        f"좋습니다, 이제 {round_number}라운드로 넘어가겠습니다. 발언권을 요청해주세요. 지금부터 {SELECTION_TIMEOUT_SEC}초 동안 신청을 받겠습니다.",
+    )
 
     async def _timeout():
         try:
@@ -552,6 +557,10 @@ async def _finalize_selection(room_state: dict, room_id_str: str) -> None:
     if skipped:
         for side in skipped:
             await _emit_system_message(room_state, f"Moderator: {side} has no available speaker. Skipping.")
+
+    next_speaker = _next_speaker(room_state)
+    if next_speaker:
+        await _emit_system_message(room_state, f"{next_speaker['user_name']}님 발언해주세요.")
 
     _start_turn_timer(room_state, room_id_str)
     await sio.emit(
@@ -643,22 +652,33 @@ def _filter_messages_for_user(messages: List[dict], user_id: Optional[str]) -> L
     return filtered
 
 
-def _get_personal_feedbacks(room_state: dict) -> Dict[str, dict]:
+async def _get_personal_feedbacks(room_state: dict) -> Dict[str, dict]:
     state = _graph_base_state(room_state, include_premium=True)
     state["messages"] = list(room_state.get("dialogue_messages", []))
     config = _graph_config(f"debate_{room_state['room_id']}_personal")
 
     feedbacks: Dict[str, dict] = {}
+    loop = asyncio.get_running_loop()
 
     try:
-        pro_result = debate_app.invoke(Command(update=state, goto="pro_feedback"), config)
+        pro_result = await loop.run_in_executor(
+            None,
+            debate_app.invoke,
+            Command(update=state, goto="pro_feedback"),
+            config,
+        )
         if isinstance(pro_result, dict):
             feedbacks.update(pro_result.get("premium_feedbacks", {}) or {})
     except Exception:
         traceback.print_exc()
 
     try:
-        con_result = debate_app.invoke(Command(update=state, goto="con_feedback"), config)
+        con_result = await loop.run_in_executor(
+            None,
+            debate_app.invoke,
+            Command(update=state, goto="con_feedback"),
+            config,
+        )
         if isinstance(con_result, dict):
             feedbacks.update(con_result.get("premium_feedbacks", {}) or {})
     except Exception:
@@ -737,16 +757,85 @@ async def _run_topic_summary(room_state: dict) -> Optional[dict]:
     config = _graph_config(f"debate_{room_state['room_id']}_topic")
     loop = asyncio.get_running_loop()
     command = Command(update=state, goto="analyze_topic")
-    result = await loop.run_in_executor(None, debate_app.invoke, command, config)
-    return result.get("topic_analysis") if isinstance(result, dict) else None
+    room_id = str(room_state["room_id"])
+
+    def _extract_topic_analysis(payload) -> Optional[dict]:
+        if not payload:
+            debug_payload = _debug_payload(
+                "warn",
+                "GRAPH",
+                room_id,
+                None,
+                "topic_summary result=None",
+            )
+            _debug_print(debug_payload)
+            return None
+        if isinstance(payload, dict):
+            if "topic_analysis" in payload:
+                return payload.get("topic_analysis")
+            if payload.get("update") and isinstance(payload.get("update"), dict):
+                if "topic_analysis" in payload["update"]:
+                    return payload["update"].get("topic_analysis")
+            if any(key in payload for key in ("description", "pro_args", "con_args")):
+                return payload
+            debug_payload = _debug_payload(
+                "warn",
+                "GRAPH",
+                room_id,
+                None,
+                f"topic_summary unexpected_keys={list(payload.keys())}",
+            )
+            _debug_print(debug_payload)
+            return None
+        if all(hasattr(payload, attr) for attr in ("description", "pro_args", "con_args")):
+            return payload
+        debug_payload = _debug_payload(
+            "warn",
+            "GRAPH",
+            room_id,
+            None,
+            f"topic_summary unexpected_type={type(payload)}",
+        )
+        _debug_print(debug_payload)
+        return None
+
+    for attempt in range(2):
+        result = await loop.run_in_executor(None, debate_app.invoke, command, config)
+        topic_analysis = _extract_topic_analysis(result)
+        if topic_analysis is not None:
+            return topic_analysis
+        debug_payload = _debug_payload(
+            "warn",
+            "GRAPH",
+            room_id,
+            None,
+            f"topic_summary empty_result attempt={attempt + 1}",
+        )
+        _debug_print(debug_payload)
+
+    fallback_topic = room_state.get("topic")
+    if fallback_topic:
+        debug_payload = _debug_payload(
+            "warn",
+            "GRAPH",
+            room_id,
+            None,
+            "topic_summary fallback=topic_only",
+        )
+        _debug_print(debug_payload)
+        return {"description": str(fallback_topic), "pro_args": [], "con_args": []}
+
+    return None
 
 
-def _run_round_summary(room_state: dict, round_number: int) -> str:
+async def _run_round_summary(room_state: dict, round_number: int) -> str:
     state = _graph_base_state(room_state)
     state["current_turn"] = round_number
     state["messages"] = list(room_state["round_messages"].get(round_number, []))
     config = _graph_config(f"debate_{room_state['room_id']}_summary_{round_number}")
-    result = debate_app.invoke(Command(update=state, goto="summary"), config)
+    command = Command(update=state, goto="summary")
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(None, debate_app.invoke, command, config)
     summary_history = []
     if isinstance(result, dict):
         summary_history = result.get("summary_history", [])
@@ -845,13 +934,17 @@ async def _complete_turn(
     )
 
     if has_next_turn:
+        next_speaker = _next_speaker(room_state)
+        if next_speaker:
+            await _emit_system_message(room_state, f"{next_speaker['user_name']}님 발언해주세요.")
         return
 
     round_number = room_state["current_round"]
 
     try:
+        await _emit_system_message(room_state, "정리하겠습니다. 지금까지의 핵심 논점을 요약합니다.")
         await _emit_loading_message(room_state, "AI가 입력중입니다")
-        summary_text = _run_round_summary(room_state, round_number)
+        summary_text = await _run_round_summary(room_state, round_number)
         parts = _parse_round_summary(summary_text)
         if not parts:
             await _emit_system_message(room_state, summary_text)
@@ -880,8 +973,7 @@ async def _complete_turn(
     next_round = round_number + 1
 
     if _needs_selection(room_state, next_round):
-        _start_selection_phase(room_state, room_id_str, next_round)
-        await _emit_system_message(room_state, "Moderator: 발언 신청을 시작합니다.")
+        await _start_selection_phase(room_state, room_id_str, next_round)
 
         async with AsyncSessionLocal() as db:
             room = await db.get(DebateRoom, int(room_id_str))
@@ -911,6 +1003,14 @@ async def _complete_turn(
             room.status = _round_status(next_round)
             await db.commit()
 
+    await _emit_system_message(
+        room_state,
+        f"좋습니다, 이제 {next_round}라운드로 넘어가겠습니다. 서로의 논리를 더 구체화해 주세요.",
+    )
+    next_speaker = _next_speaker(room_state)
+    if next_speaker:
+        await _emit_system_message(room_state, f"{next_speaker['user_name']}님 발언해주세요.")
+
     _start_turn_timer(room_state, room_id_str)
     await sio.emit(
         "debate_update",
@@ -924,16 +1024,17 @@ async def _complete_turn(
 
 
 # 1. 기존의 _format_moderator_report는 삭제하고 이 함수를 추가하세요.
-def _get_final_report_data(room_state: dict) -> Optional[dict]:
+async def _get_final_report_data(room_state: dict) -> Optional[dict]:
     """사회자 최종 리포트 객체를 생성하고 JSON safe한 dict로 반환합니다."""
     state = _graph_base_state(room_state)
     state["messages"] = list(room_state.get("dialogue_messages", []))
     config = _graph_config(f"debate_{room_state['room_id']}_final")
-    
-    # LangGraph 실행 (moderator_shared 노드로 이동)
-    result = debate_app.invoke(Command(update=state, goto="moderator_shared"), config)
+
+    command = Command(update=state, goto="moderator_shared")
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(None, debate_app.invoke, command, config)
     report = result.get("moderator_report") if isinstance(result, dict) else None
-    
+
     # Pydantic 모델이나 객체를 JSON으로 보낼 수 있게 dict로 변환
     return _to_json_safe(report)
 
@@ -947,8 +1048,20 @@ async def _finalize_debate(room_state: dict, room_id_str: str, sid: Optional[str
     room_state["selection_round"] = None
     report_data = None
     try:
+        await _emit_system_message(room_state, "최종 판단을 위해 양측의 논리를 종합하겠습니다.")
         await _emit_loading_message(room_state, "AI가 입력중입니다")
-        report_data = _get_final_report_data(room_state)
+        try:
+            report_data = await asyncio.wait_for(_get_final_report_data(room_state), timeout=240)
+        except asyncio.TimeoutError:
+            timeout_payload = _debug_payload(
+                "warn",
+                "GRAPH",
+                room_id_str,
+                None,
+                "final_report timeout=240s",
+            )
+            _debug_print(timeout_payload)
+            report_data = None
         if report_data:
             await _emit_system_message(room_state, report_data.get("general_summary", ""), "report_summary")
             await _emit_system_message(room_state, report_data.get("pro_eval", {}), "report_pro")
@@ -962,7 +1075,8 @@ async def _finalize_debate(room_state: dict, room_id_str: str, sid: Optional[str
         await _emit_loading_end(room_state)
 
     try:
-        personal_feedbacks = _get_personal_feedbacks(room_state)
+        await _emit_loading_message(room_state, "AI가 입력중입니다")
+        personal_feedbacks = await _get_personal_feedbacks(room_state)
         if personal_feedbacks:
             for user_id, report in personal_feedbacks.items():
                 if not isinstance(report, dict):
@@ -970,6 +1084,8 @@ async def _finalize_debate(room_state: dict, room_id_str: str, sid: Optional[str
                 await _emit_personal_feedback(room_state, user_id, report)
     except Exception:
         traceback.print_exc()
+    finally:
+        await _emit_loading_end(room_state)
 
     saved_result = False
     payload = _build_result_payload(room_state, report_data)
@@ -1122,6 +1238,19 @@ async def handle_start(sid, data):
     lock = _get_lock(room_id_str)
 
     async with lock:
+        room_state = _room_states.get(room_id_str)
+        if room_state:
+            if room_state.get("start_in_progress"):
+                payload = _debug_payload("warn", "START", room_id_str, str(user_id), "start_in_progress")
+                _debug_print(payload)
+                await _emit_debug(payload, room_id_str, sid=sid)
+                return
+            if room_state.get("current_round", 0) > 0:
+                payload = _debug_payload("warn", "START", room_id_str, str(user_id), "already_started_in_memory")
+                _debug_print(payload)
+                await _emit_debug(payload, room_id_str, sid=sid)
+                return
+
         payload = _debug_payload("info", "START", room_id_str, str(user_id), "start_debate received")
         _debug_print(payload)
         await _emit_debug(payload, room_id_str, sid=sid)
@@ -1191,6 +1320,7 @@ async def handle_start(sid, data):
                     return
 
                 room_state = _build_room_state(room, participants)
+                room_state["start_in_progress"] = True
                 _room_states[room_id_str] = room_state
                 start_msgs = [
                     "여러분의 멋진 생각을 들려줄 토론의 문이 열렸습니다.\n준비한 만큼 당당하게 이야기를 시작해 볼까요?",
@@ -1198,7 +1328,7 @@ async def handle_start(sid, data):
                     "토론 시작!\n친구의 생각에 귀를 기울이며 논리적인 대화를 나누어 보아요.",
                     "생각의 힘을 기르는 토론의 장이 마련되었습니다.\n서로 다른 의견이 만나 어떤 결론을 만들어낼지 기대하며 시작해 보겠습니다."
                 ]
-                num_msg = randint(0, len(start_msgs))
+                num_msg = randint(0, len(start_msgs)-1)
                 await _emit_system_message(room_state, start_msgs[num_msg])
 
                 # Topic summary at debate start (LLM).
@@ -1208,8 +1338,17 @@ async def handle_start(sid, data):
                     _debug_print(graph_payload, state=str(room.status))
                     await _emit_debug(graph_payload, room_id_str, sid=sid)
                     try:
-                        topic_analysis = await asyncio.wait_for(_run_topic_summary(room_state), timeout=15)
+                        topic_analysis = await asyncio.wait_for(_run_topic_summary(room_state), timeout=60)
                     except asyncio.TimeoutError:
+                        timeout_payload = _debug_payload(
+                            "warn",
+                            "GRAPH",
+                            room_id_str,
+                            str(user_id),
+                            "topic_summary timeout=60s",
+                        )
+                        _debug_print(timeout_payload, state=str(room.status))
+                        await _emit_debug(timeout_payload, room_id_str, sid=sid)
                         topic_analysis = None
                     room_state["topic_analysis"] = topic_analysis
                     parts = _format_topic_analysis_parts(topic_analysis)
@@ -1252,6 +1391,14 @@ async def handle_start(sid, data):
                 _debug_print(state_payload, state=str(room.status))
                 await _emit_debug(state_payload, room_id_str, sid=sid)
 
+                await _emit_system_message(
+                    room_state,
+                    "토론을 시작하겠습니다. 먼저 1라운드입니다. 차분히 주장 펼쳐주세요.",
+                )
+                next_speaker = _next_speaker(room_state)
+                if next_speaker:
+                    await _emit_system_message(room_state, f"{next_speaker['user_name']}님 발언해주세요.")
+
                 _start_turn_timer(room_state, room_id_str)
                 await sio.emit(
                     "debate_update",
@@ -1267,6 +1414,10 @@ async def handle_start(sid, data):
                 print("Error while starting debate")
                 traceback.print_exc()
                 await _emit_error("Failed to start debate.", room_id_str, sid=sid)
+            finally:
+                room_state = _room_states.get(room_id_str)
+                if room_state:
+                    room_state["start_in_progress"] = False
 
 
 @sio.on("end_debate")
