@@ -316,6 +316,11 @@ class DebateService:
                 self._apply_xp(user, gain)
                 db.add(user)
 
+            if user:
+                await self._check_participation_badges(db, user)
+                await self._check_win_rate_badge(db, user)
+                db.add(user)
+
         room.status = DebateStatus.FINISHED
         if room.finished_at is None:
             room.finished_at = decided_at
@@ -328,6 +333,58 @@ class DebateService:
             "decided_at": decided_at,
             "decided_by": payload.decided_by
         }
+    
+    async def _check_participation_badges(self, db: AsyncSession, user: User):
+        """참여 횟수 기반 뱃지 체크 (새싹, 피어나는, 열혈)"""
+        # 완료된 토론 참여 횟수 조회
+        query = select(func.count()).select_from(DebateParticipant).join(
+            DebateRoom, DebateParticipant.debate_room_id == DebateRoom.debate_room_id
+        ).where(
+            DebateParticipant.user_id == user.user_id,
+            DebateRoom.status == DebateStatus.FINISHED
+        )
+        result = await db.execute(query)
+        count = result.scalar() or 0
+
+        # 조건에 따라 순차적으로 체크
+        if count >= 1:
+            await self._add_badge(db, user, BadgeType.SPROUT) # 새싹 토론가
+        if count >= 20:
+            await self._add_badge(db, user, BadgeType.BLOOMING) # 피어나는 토론가
+        if count >= 100:
+            await self._add_badge(db, user, BadgeType.PASSIONATE) # 열혈 토론가
+
+    async def _check_win_rate_badge(self, db: AsyncSession, user: User):
+        """승률 기반 뱃지 체크 (토론왕: 최근 20판 승률 70% 이상)"""
+        # 최근 20판의 완료된 토론 결과 조회
+        subquery = select(DebateParticipant.result).join(
+            DebateRoom, DebateParticipant.debate_room_id == DebateRoom.debate_room_id
+        ).where(
+            DebateParticipant.user_id == user.user_id,
+            DebateRoom.status == DebateStatus.FINISHED
+        ).order_by(
+            desc(DebateRoom.finished_at)
+        ).limit(20)
+        
+        result = await db.execute(subquery)
+        recent_results = result.scalars().all()
+
+        if not recent_results:
+            return
+
+        total_games = len(recent_results)
+        # 최소 20판을 채워야 하는지, 20판 미만이어도 되는지는 기획에 따름.
+        # 여기서는 "최근 20판 중"이라는 문맥상 데이터가 충분할 때를 기준으로 하거나, 
+        # 그냥 현재 모수(최대 20)에서 계산할 수 있습니다. 
+        # (일반적으로 '최근 20판 승률'은 20판이 안되면 뱃지를 안 주는 경우가 많습니다.)
+        if total_games < 20: 
+            return
+
+        win_count = sum(1 for r in recent_results if r == DebateResult.WIN)
+        win_rate = win_count / total_games
+
+        if win_rate >= 0.7:
+            await self._add_badge(db, user, BadgeType.KING)
 
     async def get_popular_verdicts(self, db: AsyncSession, limit: int = 6) -> list[dict]:
         query = select(DebateRoom).where(
@@ -588,8 +645,10 @@ class DebateService:
     async def _add_badge(self, db: AsyncSession, user: User, badge_type: BadgeType):
         """유저에게 뱃지 추가 (중복 체크)"""
         badge_name = badge_type.value
+        # SQLAlchemy 모델의 JSON 타입 필드는 Mutable하지 않을 수 있어 복사본 생성
         current_badges = list(user.badges) if user.badges else []
         
+        # 이미 보유 중인지 확인
         if any(b.get('name') == badge_name for b in current_badges):
             return
 
@@ -598,7 +657,9 @@ class DebateService:
             "acquired_at": datetime.now().isoformat()
         }
         current_badges.append(new_badge)
+        
+        # 변경사항 감지를 위해 재할당
         user.badges = current_badges
-        db.add(user)
+        # user 객체는 호출한 쪽(set_debate_results)에서 add/commit 됨
 
 debate_service = DebateService()

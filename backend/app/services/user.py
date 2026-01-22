@@ -1,8 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from datetime import datetime
 
 from models.user import User
-from models.enums import AuthProvider
+from models.enums import AuthProvider, BadgeType
 
 class UserService:
     async def get_or_create_social_user(
@@ -32,7 +33,11 @@ class UserService:
             email=email,
             phone_number=phone_number,
             birth_date=birth_date,
-            gender=gender
+            gender=gender,
+            badges=[{
+                "name": BadgeType.SEED.value,
+                "acquired_at": datetime.now().isoformat() 
+            }]
         )
 
         db.add(new_user)
@@ -55,5 +60,37 @@ class UserService:
             await db.commit()
             await db.refresh(user)
         return user
+    
+    async def like_user(self, db: AsyncSession, target_user_id: int) -> User | None:
+            """좋아요 증가 및 인기 토론가 뱃지 체크 로직"""
+            user = await self.get_by_id(db, target_user_id)
+            if not user:
+                return None
+                
+            user.likes_received += 1
+            
+            # 인기 토론가 (좋아요 30개 이상) 체크
+            if user.likes_received >= 30:
+                self._add_badge_local(user, BadgeType.POPULAR)
+                
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+            return user
+
+    def _add_badge_local(self, user: User, badge_type: BadgeType):
+            """내부 헬퍼: 뱃지 중복 확인 후 추가"""
+            badge_name = badge_type.value
+            current_badges = list(user.badges) if user.badges else []
+            
+            if any(b.get('name') == badge_name for b in current_badges):
+                return
+
+            new_badge = {
+                "name": badge_name,
+                "acquired_at": datetime.now().isoformat()
+            }
+            current_badges.append(new_badge)
+            user.badges = current_badges
     
 user_service = UserService()

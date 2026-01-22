@@ -12,6 +12,45 @@ import {
 import "../styles/Modal.css";
 import "../styles/MyPage.css";
 
+const BADGE_CONFIG = [
+    {
+        type: "SEED",
+        name: "씨앗 토론가",
+        description: "신규 가입 시 부여",
+        icon: "🌱"
+    },
+    {
+        type: "SPROUT",
+        name: "새싹 토론가",
+        description: "첫 토론 참여 완료",
+        icon: "🌿"
+    },
+    {
+        type: "BLOOMING",
+        name: "피어나는 토론가",
+        description: "토론 참여 20회 달성",
+        icon: "🌸"
+    },
+    {
+        type: "PASSIONATE",
+        name: "열혈 토론가",
+        description: "토론 참여 100회 달성",
+        icon: "🔥"
+    },
+    {
+        type: "POPULAR",
+        name: "인기 토론가",
+        description: "좋아요 30개 이상 획득",
+        icon: "💖"
+    },
+    {
+        type: "KING",
+        name: "토론왕",
+        description: "최근 20판 승률 70% 이상",
+        icon: "👑"
+    }
+];
+
 function MyPage() {
     const { user } = useAuth();
     const [historyRecords, setHistoryRecords] = useState([]);
@@ -33,6 +72,20 @@ function MyPage() {
     const [personalQuery, setPersonalQuery] = useState("");
     const [personalOpen, setPersonalOpen] = useState(false);
     const [personalTarget, setPersonalTarget] = useState(null);
+
+    const myBadges = useMemo(() => {
+        const userBadges = user?.badges || [];
+        
+        return BADGE_CONFIG.map((config) => {
+            const earnedBadge = userBadges.find((b) => b.name === config.name);
+            
+            return {
+                ...config,
+                earned: !!earnedBadge,
+                acquired_at: earnedBadge ? earnedBadge.acquired_at : null
+            };
+        });
+    }, [user]);
 
     const mockProfile = useMemo(() => ({
         nickname: user?.nickname || "Guest",
@@ -243,13 +296,6 @@ function MyPage() {
         };
     }, [historyRecords]);
 
-    const badges = [
-        { id: 1, name: "첫 토론 완주", earned: true },
-        { id: 2, name: "연속 5회 참여", earned: true },
-        { id: 3, name: "승률 60% 달성", earned: false },
-        { id: 4, name: "피드백 상위 10%", earned: false },
-    ];
-
     const handleOpenReplay = async (record) => {
         const token = localStorage.getItem("access_token");
         if (!token || !record?.id) {
@@ -351,7 +397,7 @@ function MyPage() {
                     setPersonalTarget(item);
                     setPersonalOpen(true);
                 }}
-                badges={badges}
+                badges={myBadges}
                 nickname={mockProfile.nickname}
             />
             {replayOpen && (
@@ -1496,15 +1542,33 @@ function PersonalFeedbackModal({ item, onClose }) {
 }
 
 function BadgesTab({ badges }) {
+    const formatDate = (isoString) => {
+        if (!isoString) return "";
+        const date = new Date(isoString);
+        return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+    };
+
     return (
         <div className="badges-grid">
             {badges.map((badge) => (
-                <div key={badge.id} className={`badge-card ${badge.earned ? "earned" : "locked"}`}>
+                <div 
+                    key={badge.name} 
+                    className={`badge-card ${badge.earned ? "earned" : "locked"}`}
+                    title={badge.description} // 마우스 오버 시 조건 표시
+                >
                     <span className={`badge-icon ${badge.earned ? "earned" : "locked"}`}>
-                        {badge.earned ? "OK" : "LOCK"}
+                        {/* 아이콘이 있으면 아이콘 표시, 없으면 텍스트 */}
+                        {badge.earned ? (badge.icon || "OK") : "🔒"}
                     </span>
                     <strong>{badge.name}</strong>
-                    <span>{badge.earned ? "획득 완료" : "미획득"}</span>
+                    
+                    {/* 획득 상태에 따른 텍스트 표시 */}
+                    <span className="badge-status">
+                        {badge.earned ? formatDate(badge.acquired_at) : "미획득"}
+                    </span>
+                    
+                    {/* (선택사항) 설명 텍스트를 항상 보여주고 싶다면 아래 주석 해제 */}
+                    {/* <p className="badge-desc">{badge.description}</p> */}
                 </div>
             ))}
         </div>
