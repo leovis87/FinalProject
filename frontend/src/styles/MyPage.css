@@ -249,7 +249,6 @@
 
 .personal-feedback-snippet {
     display: -webkit-box;
-    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     font-size: 12px;
@@ -1354,4 +1353,40 @@
     .badges-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+}
+
+/* 티어 배지 기본 스타일 */
+.tier-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 800;
+    border: 1.5px solid transparent;
+}
+
+/* 티어별 색상 정의 */
+.tier-옹알이 { background: #f1f5f9; color: #64748b; border-color: #cbd5e1; }
+.tier-입문자 { background: #ecfdf5; color: #059669; border-color: #a7f3d0; }
+.tier-아마추어 { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
+.tier-프로 { background: #fef9c3; color: #ca8a04; border-color: #fde68a; }
+.tier-마스터 { background: #faf5ff; color: #7c3aed; border-color: #e9d5ff; }
+
+.test-btn-group {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+}
+
+.test-btn-group button {
+    padding: 4px 8px;
+    font-size: 12px;
+    border: 1px solid #ddd;
+    background: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.test-btn-group button:hover {
+    background: #f0f0f0;
 }

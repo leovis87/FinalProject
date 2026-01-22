@@ -23,7 +23,7 @@ function NicknameModal() {
 
         try {
             const token = localStorage.getItem("access_token");
-            const response = await fetch("http://localhost:8000/api/users/me/nickname", {
+            const response = await fetch("http://61.40.108.149:8000/api/users/me/nickname", {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",

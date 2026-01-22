@@ -5,7 +5,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from core.database import Base
-from .enums import AuthProvider
+from .enums import AuthProvider, UserTier
 
 class User(Base):
     __tablename__ = "users"
@@ -49,3 +49,14 @@ class User(Base):
 
     created_rooms = relationship("DebateRoom", back_populates="creator")
     participations = relationship("DebateParticipant", back_populates="user", cascade="all, delete-orphan")
+
+    # 티어 필드 추가
+    tier = Column(
+        SAEnum(UserTier, name="user_tier_enum", native_enum=False),
+        default=UserTier.ONG_AL_YI,
+        nullable=False
+    )
+    
+    level = Column(Integer, default=1, nullable=False)
+    exp = Column(Integer, default=0, nullable=False)
+    points = Column(Integer, default=0, nullable=False)

@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
-from models.enums import AuthProvider
+from models.enums import AuthProvider, UserTier
 
 class BadgeSchema(BaseModel):
     name: str
@@ -32,3 +32,18 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     user_info: Optional[UserRead] = None
+
+
+class UserRead(UserBase):
+    user_id: int
+    provider: AuthProvider
+    is_premium: bool
+    tier: UserTier  # 티어 정보 추가
+    level: int
+    exp: int
+    points: int
+    badges: List[BadgeSchema] = []
+    likes_received: int
+
+    class Config:
+        from_attributes = True

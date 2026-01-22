@@ -9,7 +9,8 @@ export function AuthProvider({ children }) {
 
     const fetchMe = useCallback(async (token) => {
         try {
-            const response = await fetch("http://localhost:8000/api/users/me", {
+            // localhost:8000을 외부 IP:8000으로 변경
+            const response = await fetch("http://61.40.108.149:8000/api/users/me", {
                 headers: {
                     "Authorization": `Bearer ${token}`
                 }

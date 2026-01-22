@@ -67,6 +67,17 @@ async def get_test_users(db: AsyncSession = Depends(get_db)):
     users = result.scalars().all()
     return users
 
+
+@router.post("/me/points/test")
+async def update_my_points_test(
+    amount: int, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # UserService의 add_points를 호출하면 티어가 자동으로 계산되어 저장됩니다.
+    updated_user = await user_service.add_points(db, current_user.user_id, amount)
+    return updated_user
+
 @router.post("/login/test", response_model=Token)
 async def test_login(
     body: TestLoginRequest, 

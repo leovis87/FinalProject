@@ -12,6 +12,15 @@ import {
 import "../styles/Modal.css";
 import "../styles/MyPage.css";
 
+// 티어별 다음 단계까지 필요한 목표 점수 설정
+const nextTierMap = {
+    "옹알이": 100,
+    "입문자": 300,
+    "아마추어": 600,
+    "프로": 1000,
+    "마스터": 2000 // 마스터는 만점 혹은 고정값
+};
+
 const BADGE_CONFIG = [
     {
         type: "SEED",
@@ -86,14 +95,6 @@ function MyPage() {
             };
         });
     }, [user]);
-
-    const mockProfile = useMemo(() => ({
-        nickname: user?.nickname || "Guest",
-        intro: "꾸준히 성장하는 토론가입니다.",
-        level: 1,
-        currentXp: 0,
-        maxXp: 100,
-    }), [user]);
 
     const activityData = useMemo(() => {
         const weekLabels = ["일", "월", "화", "수", "목", "금", "토"];
@@ -178,7 +179,7 @@ function MyPage() {
             setHistoryError("");
 
             try {
-                const response = await fetch("http://localhost:8000/api/debates/history", {
+                const response = await fetch("http://61.40.108.149:8000/api/debates/history", {
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },
@@ -245,7 +246,7 @@ function MyPage() {
             setPersonalError("");
             try {
                 const results = await Promise.all(historyRecords.map(async (record) => {
-                    const response = await fetch(`http://localhost:8000/api/debates/${record.id}/messages`, {
+                    const response = await fetch(`http://61.40.108.149:8000/api/debates/${record.id}/messages`, {
                         headers: {
                             Authorization: `Bearer ${token}`,
                         },
@@ -312,7 +313,7 @@ function MyPage() {
         setReplayMessages([]);
 
         try {
-            const response = await fetch(`http://localhost:8000/api/debates/${record.id}/messages`, {
+            const response = await fetch(`http://61.40.108.149:8000/api/debates/${record.id}/messages`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -352,7 +353,7 @@ function MyPage() {
         setVerdictData(null);
 
         try {
-            const response = await fetch(`http://localhost:8000/api/debates/${record.id}/verdict`, {
+            const response = await fetch(`http://61.40.108.149:8000/api/debates/${record.id}/verdict`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -377,9 +378,14 @@ function MyPage() {
         setVerdictMeta(null);
     };
 
-    return (
+    // MyPage 컴포넌트 하단
+return (
         <MyPageLayout>
+            {/* 1. 중복된 ProfileSummary 삭제 */}
+            
+            {/* 2. 바로 통계 요약부터 시작 */}
             <StatsOverview stats={stats} />
+            
             <ActivityTabs
                 activityData={activityData}
                 recentDebates={recentDebates}
@@ -398,76 +404,42 @@ function MyPage() {
                     setPersonalOpen(true);
                 }}
                 badges={myBadges}
-                nickname={mockProfile.nickname}
+                nickname={user?.nickname || user?.name}
             />
-            {replayOpen && (
-                <ReplayModal
-                    record={replayMeta}
-                    status={replayStatus}
-                    error={replayError}
-                    messages={replayMessages}
-                    onClose={handleCloseReplay}
-                />
-            )}
-            {verdictOpen && (
-                <VerdictModal
-                    record={verdictMeta}
-                    status={verdictStatus}
-                    error={verdictError}
-                    verdict={verdictData}
-                    onClose={handleCloseVerdict}
-                />
-            )}
-            {personalOpen && (
-                <PersonalFeedbackModal
-                    item={personalTarget}
-                    onClose={() => {
-                        setPersonalOpen(false);
-                        setPersonalTarget(null);
-                    }}
-                />
-            )}
-        </MyPageLayout>
-    );
-}
 
+        {/* 모달 로직들 */}
+        {replayOpen && (
+            <ReplayModal
+                record={replayMeta}
+                status={replayStatus}
+                error={replayError}
+                messages={replayMessages}
+                onClose={handleCloseReplay}
+            />
+        )}
+        {verdictOpen && (
+            <VerdictModal
+                record={verdictMeta}
+                status={verdictStatus}
+                error={verdictError}
+                verdict={verdictData}
+                onClose={handleCloseVerdict}
+            />
+        )}
+        {personalOpen && (
+            <PersonalFeedbackModal
+                item={personalTarget}
+                onClose={() => {
+                    setPersonalOpen(false);
+                    setPersonalTarget(null);
+                }}
+            />
+        )}
+    </MyPageLayout>
+);
+}
 function MyPageLayout({ children }) {
     return <div className="mypage-container">{children}</div>;
-}
-
-function ProfileSummary({ profile }) {
-    const xpPercent = Math.round((profile.currentXp / profile.maxXp) * 100);
-    const remainingXp = Math.max(0, profile.maxXp - profile.currentXp);
-
-    return (
-        <section className="mypage-card profile-summary">
-            <div className="profile-main">
-                <div className="profile-avatar">
-                    <img
-                        src={`https://api.dicebear.com/9.x/notionists/svg?seed=${profile.nickname}&backgroundColor=transparent`}
-                        alt="Profile"
-                    />
-                </div>
-                <div className="profile-text">
-                    <span className="profile-label">프로필</span>
-                    <h2>{profile.nickname}</h2>
-                    <p>{profile.intro}</p>
-                </div>
-            </div>
-            <div className="profile-progress">
-                <div className="profile-level">
-                    <span className="mypage-level-chip">LV.{profile.level}</span>
-                    <span className="mypage-xp-text">
-                        {profile.currentXp} / {profile.maxXp} XP
-                    </span>
-                </div>
-                <div className="mypage-progress-track">
-                    <div className="mypage-progress-fill" style={{ width: `${xpPercent}%` }} />
-                </div>
-                <span className="mypage-xp-remaining">다음 레벨까지 {remainingXp} XP</span>
-            </div>
-        </section>
-    );
 }
 
 function StatsOverview({ stats }) {
