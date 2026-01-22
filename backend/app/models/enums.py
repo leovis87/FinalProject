@@ -74,3 +74,11 @@ class BadgeType(str, enum.Enum):
     PASSIONATE = "열혈 토론가"  # 토론 참여 100회
     POPULAR = "인기 토론가"    # 좋아요 30개
     KING = "토론왕"          # 최근 20판 승률 70%
+
+# 사용자 티어 (랭크)
+class UserTier(str, enum.Enum):
+    ONG_AL_YI = "옹알이"      # 0점 ~ 99점
+    BEGINNER = "입문자"       # 100점 ~ 299점
+    AMATEUR = "아마추어"      # 300점 ~ 599점
+    PRO = "프로"             # 600점 ~ 999점
+    MASTER = "마스터"         # 1000점 이상

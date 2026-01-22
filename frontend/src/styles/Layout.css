@@ -212,3 +212,19 @@
     margin-bottom: 8px;
     line-height: 1.5;
 }
+
+.header-tier {
+    margin-left: 8px;
+    padding: 2px 8px;
+    font-size: 11px; /* 헤더에 맞춰 조금 더 작게 조절 */
+    vertical-align: middle;
+}
+
+/* 기존 티어 색상 정의 유지 */
+.tier-badge {
+    border-radius: 12px;
+    font-weight: bold;
+    border: 1px solid transparent;
+}
+.tier-옹알이 { background: #f1f5f9; color: #64748b; border-color: #cbd5e1; }
+.tier-입문자 { background: #ecfdf5; color: #059669; border-color: #a7f3d0; }

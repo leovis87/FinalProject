@@ -39,7 +39,13 @@ function Header() {
                             />
                         </div>
                         <div className="profile-info">
-                            <div className="profile-name">{user?.nickname || "Guest"}</div>
+                            <div className="profile-name">{user?.nickname || "Guest"}
+                            {user.tier && (
+                                <span className={`tier-badge header-tier tier-${user.tier}`}>
+                                    {user.tier}
+                                </span>
+                            )}
+                            </div>
                             <div className="level-bar-container">
                                 <div className="level-divider"></div>
                                 <span className="level-text">레벨 {level}</span>

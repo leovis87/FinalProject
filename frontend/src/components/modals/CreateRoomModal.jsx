@@ -57,7 +57,7 @@ function CreateRoomModal({ onClose }) {
 
         try {
             const token = localStorage.getItem("access_token");
-            const response = await fetch("http://localhost:8000/rag/topics/generate", {
+            const response = await fetch("http://61.40.108.149:8000/rag/topics/generate", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -123,7 +123,7 @@ function CreateRoomModal({ onClose }) {
 
         try {
             const token = localStorage.getItem("access_token");
-            const response = await fetch("http://localhost:8000/api/debates/", {
+            const response = await fetch("http://61.40.108.149:8000/api/debates/", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
