@@ -7,10 +7,10 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    const fetchMe = useCallback(async (token) => {
+   const fetchMe = useCallback(async (token) => {
         try {
-            // localhost:8000을 외부 IP:8000으로 변경
-            const response = await fetch("http://61.40.108.149:8000/api/users/me", {
+            // 외부 IP 대신 상대 경로 사용 (Vite 프록시 활용)
+            const response = await fetch("/api/users/me", {
                 headers: {
                     "Authorization": `Bearer ${token}`
                 }

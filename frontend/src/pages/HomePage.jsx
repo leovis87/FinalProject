@@ -35,7 +35,7 @@ function HomePage() {
             setIsLoadingDebates(true);
             setDebateError("");
             try {
-                const response = await fetch("http://localhost:8000/api/debates/");
+                const response = await fetch("/api/debates/");
                 if (!response.ok) {
                     throw new Error("토론 목록을 불러오지 못했습니다.");
                 }
@@ -57,7 +57,7 @@ function HomePage() {
             setVerdictError("");
             try {
                 const token = localStorage.getItem("access_token");
-                const response = await fetch("http://localhost:8000/api/debates/verdicts/popular?limit=3", {
+                const response = await fetch("/api/debates/verdicts/popular?limit=3", {
                     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
                 });
                 if (!response.ok) {
@@ -135,7 +135,7 @@ function HomePage() {
         const runMatch = async () => {
             setIsMatching(true);
             try {
-                const response = await fetch("http://localhost:8000/api/debates/random-match", {
+                const response = await fetch("/api/debates/random-match", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",

@@ -53,7 +53,7 @@ function DebatePage() {
         const fetchRoom = async () => {
             try {
                 const token = localStorage.getItem("access_token");
-                const response = await fetch(`http://localhost:8000/api/debates/${roomId}`, {
+                const response = await fetch(`/api/debates/${roomId}`, {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
 
@@ -82,9 +82,7 @@ function DebatePage() {
     useEffect(() => {
         if (!currentUser?.user_id || socketRef.current) return;
 
-        const socket = io("http://localhost:8000", {
-            path: "/socket.io",
-            transports: ["websocket"],
+        const socket = io({ path: "/socket.io",
         });
         socketRef.current = socket;
 
