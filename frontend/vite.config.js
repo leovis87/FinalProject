@@ -1,11 +1,27 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '0.0.0.0', // 외부 접속 허용
-    port: 5173,      // 기본 포트 유지
-  }
+    host: true,
+    port: 5173,
+    proxy: {
+      // 백엔드 API 서버 프록시
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      // AI 주제 추천(RAG) 서버 프록시
+      '/rag': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      // 실시간 토론 소켓 프록시
+      '/socket.io': {
+        target: 'http://localhost:8000',
+        ws: true,
+      },
+    },
+  },
 })

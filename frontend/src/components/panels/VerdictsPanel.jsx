@@ -29,7 +29,7 @@ function VerdictsPanel({ isOpen, onClose }) {
             setError("");
             try {
                 const token = localStorage.getItem("access_token");
-                const response = await fetch("http://localhost:8000/api/debates/verdicts/popular?limit=8", {
+                const response = await fetch("/api/debates/verdicts/popular?limit=8", {
                     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
                 });
                 if (!response.ok) {

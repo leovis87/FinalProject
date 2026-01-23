@@ -179,7 +179,7 @@ function MyPage() {
             setHistoryError("");
 
             try {
-                const response = await fetch("http://61.40.108.149:8000/api/debates/history", {
+                const response = await fetch("/api/debates/history", {
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },
@@ -246,7 +246,7 @@ function MyPage() {
             setPersonalError("");
             try {
                 const results = await Promise.all(historyRecords.map(async (record) => {
-                    const response = await fetch(`http://61.40.108.149:8000/api/debates/${record.id}/messages`, {
+                    const response = await fetch(`/api/debates/${record.id}/messages`, {
                         headers: {
                             Authorization: `Bearer ${token}`,
                         },
@@ -353,7 +353,7 @@ function MyPage() {
         setVerdictData(null);
 
         try {
-            const response = await fetch(`http://61.40.108.149:8000/api/debates/${record.id}/verdict`, {
+            const response = await fetch(`/api/debates/${record.id}/verdict`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },

@@ -13,7 +13,7 @@ function LoginModal({ onClose }) {
     useEffect(() => {
         const fetchTestUsers = async () => {
             try {
-                const response = await fetch("http://localhost:8000/api/users/test-users");
+                const response = await fetch("/api/users/test-users");
                 if (response.ok) {
                     const data = await response.json();
                     setTestUsers(data);
@@ -26,7 +26,7 @@ function LoginModal({ onClose }) {
     }, []);
 
     const handleSocialLogin = (provider) => {
-        window.location.href = `http://localhost:8000/api/users/login/${provider}`
+        window.location.href = `/api/users/login/${provider}`
     }
 
     // 테스트 계정 선택 시 로그인 처리
@@ -35,7 +35,7 @@ function LoginModal({ onClose }) {
         if (!email) return;
 
         try {
-            const response = await fetch("http://localhost:8000/api/users/login/test", {
+            const response = await fetch("/api/users/login/test", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

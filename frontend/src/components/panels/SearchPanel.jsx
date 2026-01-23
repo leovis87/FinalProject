@@ -60,7 +60,7 @@ function SearchPanel({ isOpen, onClose }) {
     const fetchDebateRooms = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch("http://localhost:8000/api/debates/");
+            const response = await fetch("/api/debates/");
             if (response.ok) {
                 const data = await response.json();
                 setDebateRooms(data);
