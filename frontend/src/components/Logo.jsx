@@ -1,10 +1,10 @@
-import { GiTalk } from "react-icons/gi";
+import logoIcon from "../assets/logo-icon.png";
 
 function Logo() {
     return (
-        <div className="debate-logo">
-            <GiTalk size={30} color="#1e3a8a" />
-            <h1 className="logo-text">Debate<span>High</span></h1>
+        <div className="logo">
+            <img src={logoIcon} alt="DebateHigh Logo" className="logo-icon" />
+            <h1>DebateHigh</h1>
         </div>
     )
 }

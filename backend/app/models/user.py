@@ -3,9 +3,10 @@ from sqlalchemy import (
     String, Date, Boolean, DateTime, func, JSON
 )
 from sqlalchemy.orm import relationship
+from datetime import datetime, timedelta
 
 from core.database import Base
-from .enums import AuthProvider, UserTier
+from .enums import AuthProvider, UserTier, DebateResult
 
 class User(Base):
     __tablename__ = "users"
@@ -60,3 +61,31 @@ class User(Base):
     level = Column(Integer, default=1, nullable=False)
     exp = Column(Integer, default=0, nullable=False)
     points = Column(Integer, default=0, nullable=False)
+
+    @property
+    def total_debates(self):
+        if self.participations:
+            return len(self.participations)
+        return 0
+    
+    @property
+    def win_count(self):
+        if self.participations:
+            return sum(1 for p in self.participations if p.result == DebateResult.WIN)
+        return 0
+    
+    @property
+    def recent_debate_count(self):
+        """최근 7일 내 토론 참여 횟수"""
+        if not self.participations:
+            return 0
+        
+        limit_date = datetime.now() - timedelta(days=7)
+        count = 0
+        for p in self.participations:
+            # timezone 정보가 있을 수 있으므로 replace로 제거 후 비교하거나 둘 다 맞춤
+            if p.joined_at:
+                p_date = p.joined_at.replace(tzinfo=None)
+                if p_date >= limit_date:
+                    count += 1
+        return count

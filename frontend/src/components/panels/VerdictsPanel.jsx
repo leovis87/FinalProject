@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { RiCloseLine, RiSparkling2Line } from "react-icons/ri";
+import { debateApi } from "../../api/debateApi";
 import "../../styles/SlidePanel.css";
 import "../../styles/VerdictsPanel.css";
 
@@ -28,17 +29,13 @@ function VerdictsPanel({ isOpen, onClose }) {
             setIsLoading(true);
             setError("");
             try {
-                const token = localStorage.getItem("access_token");
-                const response = await fetch("/api/debates/verdicts/popular?limit=8", {
-                    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-                });
-                if (!response.ok) {
-                    throw new Error("판결문 목록을 불러오지 못했습니다.");
-                }
-                const data = await response.json();
+                // debateApi를 사용하여 데이터 조회 (토큰 처리는 axiosClient가 담당)
+                const response = await debateApi.getPopularVerdicts(8);
+                const data = response.data;
                 setVerdicts(Array.isArray(data) ? data : []);
             } catch (err) {
-                setError(err instanceof Error ? err.message : "판결문 불러오기 실패");
+                console.error(err);
+                setError("판결문 목록을 불러오지 못했습니다.");
             } finally {
                 setIsLoading(false);
             }

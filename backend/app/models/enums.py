@@ -18,8 +18,8 @@ class DebateLevel(str, enum.Enum):
 class DebateCategory(str, enum.Enum):
     KOREAN = "korean"       # �?��
     SOCIAL = "social"       # ?�회
+    SCIENCE = "science"
     MORAL = "moral"         # ?�덕
-    ETHICS = "ethics"       # ?�리
 
 # ?�론�??�태
 class DebateStatus(str, enum.Enum):

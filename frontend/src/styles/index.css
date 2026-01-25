@@ -10,6 +10,27 @@
 
     --logo-size: 11px;
     --medium-size: 16px;
+
+    /* refactor */
+    --color-background: #f9f8ff;
+
+    --color-primary: #1e3a8a;
+    --color-surface: #ffffff;
+    --color-secondary: #ffba5a;
+    --color-accent: ;
+
+    --color-pro: #007ec4;
+    --color-con: #bd4851;
+
+    --card-border: 5px solid #e4e6ea;
+
+    --text-white: #f9f8ff;
+    --text-muted: #64748b;
+    --text-strong: #0f172a;
+
+    --shadow-under: 0 6px 16px -6px rgba(0, 0, 0, 0.25);
+    --shadow-soft: 0 18px 48px rgba(15, 23, 42, 0.08);
+    --shadow-card: 0 10px 28px rgba(15, 23, 42, 0.08);
 }
 
 :root {
@@ -17,24 +38,25 @@
     --surface-color: #ffffff;
     --point-main-color: #2563eb;
     --point-sub-color: #14b8a6;
-    --text-strong: #0f172a;
-    --text-muted: #64748b;
+    
     --border-color: #e2e8f0;
-    --shadow-soft: 0 18px 48px rgba(15, 23, 42, 0.08);
-    --shadow-card: 0 10px 28px rgba(15, 23, 42, 0.08);
+    
 }
 
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
 }
 
 body {
     font-family: "Manrope", sans-serif;
     font-weight: 500;
-    background-color: var(--bg-color);
-    color: var(--text-strong);
+    background-color: var(--color-background);
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -45,18 +67,29 @@ a {
     color: inherit;
 }
 
-.debate-logo {
-    font-weight: 700;
-    font-size: var(--logo-size);
-    letter-spacing: -0.5px;
-    background: linear-gradient(90deg, #2563eb 0%, #0ea5e9 50%, #14b8a6 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+img {
+    -webkit-user-drag: none;
+    -khtml-user-drag: none;
+    -moz-user-drag: none;
+    -o-user-drag: none;
+}
+
+.logo {
     display: flex;
     align-items: center;
-    gap: 8px;
-    cursor: pointer;
+    gap: 5px;
+}
+
+.logo-icon {
+    width: 70px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 5px rgba(0,0,0,0.2));
+}
+
+.logo h1 {
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -2px;
 }
 
 /* 스크롤바 */
@@ -73,4 +106,8 @@ a {
 }
 ::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
+}
+
+.page-container {
+    padding: 30px 40px;
 }

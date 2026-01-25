@@ -1,0 +1,390 @@
+.find-banner-card {
+    background-color: var(--color-surface);
+    border-radius: 10px;
+    border: 3px solid var(--color-primary);
+    padding: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.find-banner-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    text-align: center;
+}
+
+.find-banner-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.find-banner-icon-box {
+    font-size: 32px;
+    color: var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.find-banner-header h2 {
+    font-size: 30px;
+    color: var(--text-strong);
+    margin: 0;
+}
+
+.find-banner-desc {
+    font-size: 16px;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.5;
+}
+
+.create-room-btn {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: var(--color-primary);
+    color: var(--text-white);
+    border: 3px solid var(--color-surface);
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+.create-room-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
+}
+
+.create-room-btn:active {
+    transform: translateY(0);
+}
+
+/* 필터 영역 */
+.find-filter-section {
+    margin-top: 24px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.find-filter-card {
+    background-color: var(--color-surface);
+    border: var(--card-border);
+    border-radius: 16px;
+    padding: 28px 32px;
+    box-shadow: var(--shadow-under);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.filter-search-row {
+    width: 100%;
+}
+
+.search-input-box {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.search-input-box .search-icon {
+    position: absolute;
+    left: 16px;
+    color: var(--text-muted);
+    font-size: 20px;
+}
+
+.search-input-box input {
+    width: 100%;
+    padding: 14px 16px 14px 48px;
+    border-radius: 12px;
+    border: 1px solid #cbd5e1;
+    font-size: 15px;
+    background-color: #f8fafc;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.search-input-box input:focus {
+    background-color: #fff;
+    border-color: var(--point-main-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.filter-label-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-icon {
+    font-size: 20px;
+    color: var(--color-primary);
+}
+
+.filter-label {
+    font-size: 15px;
+    color: var(--color-primary);
+}
+
+.filter-btn-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.filter-chip {
+    padding: 8px 16px;
+    border-radius: 10px;
+    border: 2px solid #e2e8f0;
+    background-color: #fff;
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-chip:hover {
+    background-color: #f1f5f9;
+    color: #334155;
+}
+
+.filter-chip.active {
+    background-color: var(--color-primary);
+    color: #fff;
+    border-color: var(--color-primary);
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2);
+}
+
+.filter-divider {
+    border: none;
+    height: 1px;
+    background-color: #e2e8f0;
+    margin: 4px 0;
+}
+
+.filter-count-row {
+    font-size: 14px;
+    color: #64748b;
+    text-align: right;
+}
+
+.filter-count-row strong {
+    color: var(--color-primary);
+    font-weight: 800;
+    margin: 0 2px;
+}
+
+/* 토론방 목록 */
+.room-list-section {
+    margin-top: 24px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.room-list-card {
+    background-color: #fff;
+    border: var(--card-border);
+    border-radius: 16px;
+    box-shadow: var(--shadow-under);
+    display: flex;
+    flex-direction: column;
+}
+
+.find-room-item {
+    position: relative;
+    padding: 24px;
+    border-bottom: var(--card-border);
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    border-radius: 10px;
+}
+
+.find-room-item:hover {
+    transform: translateY(-2px);
+    background-color: #f1f5f9;
+}
+
+.room-icon-wrapper {
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+    border-radius: 10px;
+    background-color: var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: var(--text-white);
+}
+
+.room-info-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-right: 80px;
+}
+
+.room-item-title {
+    font-size: 18px;
+    color: var(--color-primary);
+    margin: 0;
+    line-height: 1.3;
+}
+
+.room-item-topic {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.room-item-desc {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.5;
+    
+    /* 2줄 이상 말줄임 */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.room-tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.tag-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    border-width: 3px;
+    border-style: solid;
+    border-radius: 999px;
+}
+
+.tag-badge.subject {
+    background-color: #f8fafc;
+    color: #475569;
+    border-color: #e2e8f0;
+}
+
+.tag-badge.grade {
+    background-color: #fff1f2;
+    color: #e11d48;
+    border-color: #fecdd3;
+}
+
+.tag-badge.turn {
+    background-color: #f0fdf4;
+    color: #15803d;
+    border-color: #bbf7d0;
+}
+
+.tag-badge.mode {
+    background-color: #eff6ff;
+    color: #2563eb;
+    border-color: #bfdbfe;
+}
+
+.room-right-action {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+}
+
+.status-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.status-waiting {
+    background-color: #e2f1f0;
+    color: #408d8b;
+}
+
+.status-progress {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.status-finished {
+    background-color: #f1f5f9;
+    color: #64748b;
+}
+
+.loading-state, .empty-state {
+    text-align: center;
+    padding: 60px 0;
+    color: #94a3b8;
+    font-size: 16px;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- 아래 클래스들을 찾아서 애니메이션 속성을 추가하거나, 없으면 새로 추가하세요 --- */
+
+/* 2. 필터 영역 */
+.find-filter-section {
+    margin-top: 24px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    /* 애니메이션 추가 */
+    opacity: 0;
+    animation: fadeInUp 0.3s ease-out 0.15s forwards; /* 0.15초 딜레이 */
+}
+
+/* 3. 토론방 목록 영역 */
+.room-list-section {
+    margin-top: 24px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    /* 애니메이션 추가 */
+    opacity: 0;
+    animation: fadeInUp 0.3s ease-out 0.3s forwards; /* 0.3초 딜레이 */
+}
