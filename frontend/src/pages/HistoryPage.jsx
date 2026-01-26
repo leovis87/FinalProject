@@ -4,14 +4,16 @@ import {
     RiFileList3Line, 
     RiChatCheckLine, 
     RiSearchLine,
-    RiFilter3Line
+    RiFilter3Line,
+    RiArchiveDrawerLine,
+    RiRestartLine,
+    RiFilePaper2Line,
+    RiEmotionHappyLine,
+    RiEmotionUnhappyLine
 } from "react-icons/ri";
-import "../styles/MyPage.css"; // 스타일은 MyPage와 공유하거나 별도 CSS 사용
-import "../styles/Modal.css";
+import "../styles/HistoryPage.css";
 
-// ----------------------------------------------------------------------
-// 1. 메인 페이지 컴포넌트
-// ----------------------------------------------------------------------
+// --- 1. 메인 페이지 컴포넌트 ---
 function HistoryPage() {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState("history"); // 'history' | 'feedback'
@@ -41,21 +43,18 @@ function HistoryPage() {
     const [personalOpen, setPersonalOpen] = useState(false);
     const [personalTarget, setPersonalTarget] = useState(null);
 
-    // --- 1. 토론 기록 불러오기 ---
+    // --- 데이터 로딩 로직 ---
     useEffect(() => {
         let isMounted = true;
         const token = localStorage.getItem("access_token");
-
         if (!token) return;
 
         const fetchHistory = async () => {
             setHistoryStatus("loading");
             try {
-                // 실제 API 엔드포인트에 맞춰 수정
                 const response = await fetch("/api/debates/history", {
                     headers: { Authorization: `Bearer ${token}` },
                 });
-
                 if (!response.ok) throw new Error("기록을 불러오는데 실패했습니다.");
 
                 const data = await response.json();
@@ -70,7 +69,6 @@ function HistoryPage() {
                     result: item.result === 'win' ? '승리' : item.result === 'lose' ? '패배' : item.result === 'draw' ? '무승부' : '미정'
                 }));
 
-                // 최신순 정렬
                 mapped.sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
 
                 if (isMounted) {
@@ -84,16 +82,13 @@ function HistoryPage() {
                 }
             }
         };
-
         fetchHistory();
         return () => { isMounted = false; };
     }, [user]);
 
-    // --- 2. 개인 피드백 데이터 취합하기 ---
     useEffect(() => {
         const token = localStorage.getItem("access_token");
         if (!token || historyRecords.length === 0) return;
-
         let isMounted = true;
 
         const parseReportPayload = (content) => {
@@ -106,7 +101,6 @@ function HistoryPage() {
         const fetchFeedbacks = async () => {
             setPersonalStatus("loading");
             try {
-                // 각 토론 기록에 대해 메시지를 조회하여 'report_user' 타입만 필터링
                 const results = await Promise.all(historyRecords.map(async (record) => {
                     try {
                         const res = await fetch(`/api/debates/${record.id}/messages`, {
@@ -143,27 +137,22 @@ function HistoryPage() {
                 }
             }
         };
-
         fetchFeedbacks();
         return () => { isMounted = false; };
     }, [historyRecords]);
 
-    // --- 핸들러: 리플레이 열기 ---
+    // --- 핸들러들 ---
     const handleOpenReplay = async (record) => {
         const token = localStorage.getItem("access_token");
         if (!token) return;
-
         setReplayOpen(true);
         setReplayMeta(record);
         setReplayStatus("loading");
-        
         try {
-            // 포트나 주소는 환경에 맞게 조정 필요
             const response = await fetch(`/api/debates/${record.id}/messages`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if(!response.ok) throw new Error("리플레이 로드 실패");
-            
             const data = await response.json();
             setReplayMessages(Array.isArray(data) ? data : []);
             setReplayStatus("success");
@@ -173,21 +162,17 @@ function HistoryPage() {
         }
     };
 
-    // --- 핸들러: 판결문 열기 ---
     const handleOpenVerdict = async (record) => {
         const token = localStorage.getItem("access_token");
         if (!token) return;
-
         setVerdictOpen(true);
         setVerdictMeta(record);
         setVerdictStatus("loading");
-
         try {
             const response = await fetch(`/api/debates/${record.id}/verdict`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if(!response.ok) throw new Error("판결문 로드 실패");
-            
             const data = await response.json();
             setVerdictData(data);
             setVerdictStatus("success");
@@ -199,13 +184,21 @@ function HistoryPage() {
 
     return (
         <div className="page-container">
-            <div className="page-header">
-                <h1>기록 보관소</h1>
-                <p>지난 토론의 기록과 AI 코칭 내역을 확인하세요.</p>
-            </div>
+            {/* 상단 배너 섹션 (VerdictsPage와 동일한 구조/스타일) */}
+            <section className="history-banner-card">
+                <div className="history-banner-header">
+                    <div className="history-icon-box">
+                        <RiArchiveDrawerLine />
+                    </div>
+                    <h1 className="history-main-title">기록 보관소</h1>
+                </div>
+                <p className="history-sub-desc">
+                    나의 지난 토론 기록을 되돌아보고, AI 코칭을 통해 성장하세요.
+                </p>
+            </section>
 
-            <div className="mypage-bottom-section">
-                {/* 탭 네비게이션 */}
+            {/* 탭 네비게이션 */}
+            <div className="history-content-wrapper">
                 <div className="mypage-tabs">
                     <button 
                         className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`}
@@ -274,69 +267,91 @@ function HistoryPage() {
 }
 
 // ----------------------------------------------------------------------
-// 2. 하위 섹션 컴포넌트 (리스트 렌더링)
+// 2. 하위 섹션 컴포넌트
 // ----------------------------------------------------------------------
 
-// A. 토론 기록 리스트 섹션
 function HistoryListSection({ records, status, error, onReplay, onVerdict }) {
-    const [filter, setFilter] = useState("all"); // 'all', 'win', 'lose'
+    const [filter, setFilter] = useState("all");
+    const [search, setSearch] = useState("");
 
     const filteredRecords = useMemo(() => {
-        if (filter === 'all') return records;
-        if (filter === 'win') return records.filter(r => r.result === '승리');
-        if (filter === 'lose') return records.filter(r => r.result === '패배');
-        return records;
-    }, [records, filter]);
+        let result = records;
+        if (filter === 'win') result = result.filter(r => r.result === '승리');
+        if (filter === 'lose') result = result.filter(r => r.result === '패배');
+        
+        if (search) {
+            result = result.filter(r => r.title.includes(search));
+        }
+        return result;
+    }, [records, filter, search]);
 
-    if (status === 'loading') return <div className="loading-msg">기록을 불러오는 중...</div>;
-    if (status === 'error') return <div className="error-msg">{error}</div>;
+    if (status === 'loading') return <div className="loading-state">기록을 불러오는 중...</div>;
+    if (status === 'error') return <div className="error-text">{error}</div>;
 
     return (
         <div className="history-section animate-fade-in">
-            <div className="filter-bar">
-                <div className="filter-group">
-                    <RiFilter3Line className="filter-icon"/>
-                    <select 
-                        className="filter-select"
-                        value={filter}
-                        onChange={(e) => setFilter(e.target.value)}
-                    >
-                        <option value="all">전체 결과</option>
-                        <option value="win">승리만</option>
-                        <option value="lose">패배만</option>
-                    </select>
+            {/* 필터 바 */}
+            <div className="history-filter-bar">
+                <div className="search-input-box small">
+                    <RiSearchLine className="search-icon" />
+                    <input 
+                        type="text" 
+                        placeholder="토론 제목 검색" 
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
                 </div>
-                <div className="record-count">총 {filteredRecords.length}건</div>
+                <div className="filter-group-row">
+                    <div className="select-wrapper">
+                        <RiFilter3Line className="filter-icon-small"/>
+                        <select 
+                            className="filter-select"
+                            value={filter}
+                            onChange={(e) => setFilter(e.target.value)}
+                        >
+                            <option value="all">전체 결과</option>
+                            <option value="win">승리만</option>
+                            <option value="lose">패배만</option>
+                        </select>
+                    </div>
+                </div>
             </div>
 
-            <div className="history-list-container">
+            <div className="history-list-grid">
                 {filteredRecords.length === 0 ? (
-                    <div className="empty-state">기록이 없습니다.</div>
+                    <div className="empty-state">
+                        <p>토론 기록이 없습니다.</p>
+                    </div>
                 ) : (
                     filteredRecords.map((item) => (
                         <div key={item.id} className="history-card-item">
+                            {/* 상단: 날짜 및 뱃지 */}
+                            <div className="history-card-top">
+                                <span className="history-date">{item.date}</span>
+                                <span className={`result-badge-small ${item.result === '승리' ? 'win' : item.result === '패배' ? 'lose' : 'draw'}`}>
+                                    {item.result}
+                                </span>
+                            </div>
+
+                            {/* 중단: 제목 및 역할 */}
                             <div className="history-card-main">
-                                <div className="history-card-header">
-                                    <span className={`role-badge ${item.role === '찬성' ? 'pro' : item.role === '반대' ? 'con' : 'obs'}`}>
+                                <h3 className="history-item-title">{item.title}</h3>
+                                <div className="history-role-info">
+                                    <span className={`role-pill ${item.role === '찬성' ? 'pro' : item.role === '반대' ? 'con' : 'obs'}`}>
                                         {item.role}
                                     </span>
-                                    <span className="history-date">{item.date}</span>
+                                    <span className="role-text">측 참여</span>
                                 </div>
-                                <h3 className="history-title">{item.title}</h3>
                             </div>
                             
-                            <div className="history-card-actions">
-                                <div className={`result-tag ${item.result === '승리' ? 'win' : item.result === '패배' ? 'lose' : ''}`}>
-                                    {item.result}
-                                </div>
-                                <div className="btn-group">
-                                    <button className="action-btn outline" onClick={() => onReplay(item)}>
-                                        리플레이
-                                    </button>
-                                    <button className="action-btn primary" onClick={() => onVerdict(item)}>
-                                        판결문
-                                    </button>
-                                </div>
+                            {/* 하단: 액션 버튼 */}
+                            <div className="history-card-footer">
+                                <button className="history-action-btn outline" onClick={() => onReplay(item)}>
+                                    <RiRestartLine /> 리플레이
+                                </button>
+                                <button className="history-action-btn primary" onClick={() => onVerdict(item)}>
+                                    <RiFilePaper2Line /> 판결문
+                                </button>
                             </div>
                         </div>
                     ))
@@ -346,39 +361,38 @@ function HistoryListSection({ records, status, error, onReplay, onVerdict }) {
     );
 }
 
-// B. 피드백 리스트 섹션
 function FeedbackListSection({ feedbacks, status, error, onOpen }) {
     const [query, setQuery] = useState("");
 
     const filtered = useMemo(() => {
         if (!query) return feedbacks;
         return feedbacks.filter(item => 
-            item.title.includes(query) || 
-            (item.report?.rawText && item.report.rawText.includes(query))
+            item.title.includes(query)
         );
     }, [feedbacks, query]);
 
-    const getSummary = (report) => {
+    const getPreview = (report) => {
         if (!report) return "내용 없음";
-        if (report.strength?.length > 0) return `강점: ${report.strength[0]}`;
-        if (report.weakness?.length > 0) return `개선: ${report.weakness[0]}`;
+        if (report.strength?.length > 0) return `🌟 ${report.strength[0]}`;
+        if (report.weakness?.length > 0) return `🔥 ${report.weakness[0]}`;
         return report.rawText || "상세 내용을 확인하세요.";
     };
 
-    if (status === 'loading') return <div className="loading-msg">피드백을 분석 중...</div>;
-    if (status === 'error') return <div className="error-msg">{error}</div>;
+    if (status === 'loading') return <div className="loading-state">피드백을 분석 중...</div>;
+    if (status === 'error') return <div className="error-text">{error}</div>;
 
     return (
         <div className="feedback-section animate-fade-in">
-            <div className="search-bar-container">
-                <RiSearchLine className="search-icon"/>
-                <input 
-                    type="text" 
-                    placeholder="주제 또는 내용 검색..." 
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    className="search-input"
-                />
+            <div className="history-filter-bar">
+                <div className="search-input-box small full-width">
+                    <RiSearchLine className="search-icon" />
+                    <input 
+                        type="text" 
+                        placeholder="주제 키워드로 검색..." 
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                    />
+                </div>
             </div>
 
             <div className="feedback-grid">
@@ -388,17 +402,22 @@ function FeedbackListSection({ feedbacks, status, error, onOpen }) {
                     filtered.map((item) => (
                         <div key={item.id} className="feedback-card" onClick={() => onOpen(item)}>
                             <div className="feedback-header">
-                                <span className="feedback-date">{item.date}</span>
-                                <span className={`feedback-role ${item.role === '찬성' ? 'pro' : 'con'}`}>
-                                    {item.role}
-                                </span>
+                                <div className={`feedback-result-icon ${item.result === '승리' ? 'win' : 'lose'}`}>
+                                    {item.result === '승리' ? <RiEmotionHappyLine /> : <RiEmotionUnhappyLine />}
+                                </div>
+                                <div className="feedback-meta">
+                                    <span className="feedback-date">{item.date}</span>
+                                    <span className={`feedback-role ${item.role === '찬성' ? 'pro' : 'con'}`}>
+                                        {item.role}
+                                    </span>
+                                </div>
                             </div>
                             <h4 className="feedback-title">{item.title}</h4>
-                            <p className="feedback-preview">
-                                {getSummary(item.report)}
-                            </p>
-                            <div className="feedback-footer">
-                                <span>상세 보기 &rarr;</span>
+                            <div className="feedback-preview-box">
+                                {getPreview(item.report)}
+                            </div>
+                            <div className="feedback-footer-link">
+                                상세 리포트 확인하기 &rarr;
                             </div>
                         </div>
                     ))
@@ -409,28 +428,27 @@ function FeedbackListSection({ feedbacks, status, error, onOpen }) {
 }
 
 // ----------------------------------------------------------------------
-// 3. 모달 컴포넌트 (제공된 코드 기반 단순화/통합)
+// 3. 모달 컴포넌트
 // ----------------------------------------------------------------------
 
 function ReplayModal({ record, status, error, messages, onClose }) {
-    // 메시지 파싱 및 정규화 로직 (제공된 코드의 normalizeMessages 등 활용 필요)
-    // 간략하게 렌더링하도록 처리
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content replay-modal" onClick={e => e.stopPropagation()}>
                 <button className="modal-close-btn" onClick={onClose}>×</button>
-                <div className="replay-header">
-                    <h2>{record?.title} <span className="sub">리플레이</span></h2>
+                <div className="modal-header-simple">
+                    <h2>리플레이</h2>
+                    <p>{record?.title}</p>
                 </div>
-                <div className="replay-body">
-                    {status === 'loading' && <div>대화 내용을 불러오는 중...</div>}
-                    {status === 'error' && <div className="error">{error}</div>}
+                <div className="replay-body-scroll">
+                    {status === 'loading' && <div className="loading-state">대화 내용을 불러오는 중...</div>}
+                    {status === 'error' && <div className="error-text">{error}</div>}
                     {status === 'success' && messages.map((msg, idx) => (
-                        <div key={msg.id || idx} className={`replay-msg ${msg.role}`}>
-                            <div className="msg-sender">{msg.user_name || msg.role}</div>
-                            <div className="msg-bubble">{
-                                typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)
-                            }</div>
+                        <div key={msg.id || idx} className={`chat-bubble-row ${msg.role}`}>
+                            <div className="chat-sender">{msg.user_name || (msg.role === 'ai' ? 'AI 사회자' : '참가자')}</div>
+                            <div className={`chat-bubble ${msg.role}`}>
+                                {typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -442,30 +460,31 @@ function ReplayModal({ record, status, error, messages, onClose }) {
 function VerdictModal({ record, status, error, verdict, onClose }) {
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content verdict-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-content verdict-modal-content" onClick={e => e.stopPropagation()}>
                 <button className="modal-close-btn" onClick={onClose}>×</button>
-                <div className="verdict-header">
-                    <h2>판결문</h2>
-                    <div className="verdict-winner">
-                         {record?.result === '승리' ? '👑 승리' : record?.result === '패배' ? '💀 패배' : '무승부'}
+                <div className="verdict-modal-header">
+                    <div className={`verdict-badge ${record?.result === '승리' ? 'win' : 'lose'}`}>
+                         {record?.result === '승리' ? 'WIN' : 'LOSE'}
                     </div>
+                    <h2>판결문</h2>
+                    <p className="verdict-sub-info">AI 배심원이 분석한 토론 결과입니다.</p>
                 </div>
-                <div className="verdict-body">
-                    {status === 'loading' && <div>판결문을 작성 중...</div>}
-                    {status === 'error' && <div className="error">{error}</div>}
+                <div className="verdict-scroll-body">
+                    {status === 'loading' && <div className="loading-state">판결문을 불러오는 중...</div>}
+                    {status === 'error' && <div className="error-text">{error}</div>}
                     {status === 'success' && verdict && (
-                        <>
-                            <div className="verdict-summary">
-                                <h3>총평</h3>
+                        <div className="verdict-content-wrapper">
+                            <div className="verdict-summary-section">
+                                <h3>💡 총평</h3>
                                 <p>{verdict.summary}</p>
                             </div>
-                            {/* MVP 등 추가 정보 */}
                             {verdict.best_player && (
-                                <div className="verdict-mvp">
-                                    🏆 MVP: {verdict.best_player}
+                                <div className="verdict-mvp-section">
+                                    <span className="mvp-label">🏆 MVP Player</span>
+                                    <span className="mvp-name">{verdict.best_player}</span>
                                 </div>
                             )}
-                        </>
+                        </div>
                     )}
                 </div>
             </div>
@@ -479,29 +498,26 @@ function PersonalFeedbackModal({ item, onClose }) {
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content personal-modal" onClick={e => e.stopPropagation()}>
                 <button className="modal-close-btn" onClick={onClose}>×</button>
-                <div className="modal-header">
-                    <h2>개인 코칭 리포트</h2>
+                <div className="modal-header-simple">
+                    <h2>AI 코칭 리포트</h2>
                     <p>{item?.title}</p>
                 </div>
                 <div className="modal-scroll-body">
-                    {/* 강점 */}
                     {report.strength && (
                         <div className="feedback-block good">
-                            <h3>🌟 잘한 점</h3>
+                            <h3>🌟 강점 분석</h3>
                             <ul>{report.strength.map((t, i) => <li key={i}>{t}</li>)}</ul>
                         </div>
                     )}
-                    {/* 개선점 */}
                     {report.weakness && (
                         <div className="feedback-block bad">
-                            <h3>🔥 보완할 점</h3>
+                            <h3>🔥 개선 포인트</h3>
                             <ul>{report.weakness.map((t, i) => <li key={i}>{t}</li>)}</ul>
                         </div>
                     )}
-                    {/* 추천 자료 */}
                     {report.recommended_reading && (
                         <div className="feedback-block info">
-                            <h3>📚 추천 학습</h3>
+                            <h3>📚 추천 학습 자료</h3>
                             <p>{report.recommended_reading}</p>
                         </div>
                     )}

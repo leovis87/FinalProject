@@ -133,6 +133,7 @@ class PopularVerdictItem(BaseModel):
     pro_score: Optional[float] = None
     con_score: Optional[float] = None
     summary: Optional[str] = None
+    best_player: Optional[str] = None
 
 class DebateResultItem(BaseModel):
     user_id: int

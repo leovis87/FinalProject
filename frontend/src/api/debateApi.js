@@ -32,4 +32,9 @@ export const debateApi = {
             params: { limit }
         });
     },
+
+    // 판결문 상세 조회
+    getDebateVerdict: (roomId) => {
+        return axiosClient.get(`/debates/${roomId}/verdict`);
+    }
 };
