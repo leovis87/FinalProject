@@ -67,7 +67,7 @@ function Sidebar() {
                     className={({ isActive }) => isActive ? "menu-item active" : "menu-item"}
                 >
                     <span className="menu-icon"><RiUser3Line /></span>
-                    <span>인기 판결문</span>
+                    <span>우수 판결문</span>
                 </NavLink>
                 <NavLink 
                     to="/mypage" 

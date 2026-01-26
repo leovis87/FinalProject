@@ -401,7 +401,7 @@ class DebateService:
         for room in rooms:
             msg_query = select(DebateMessage).where(
                 DebateMessage.debate_room_id == room.debate_room_id,
-                DebateMessage.display_type.in_(["report_summary", "report_pro", "report_con"]),
+                DebateMessage.display_type.in_(["report_summary", "report_pro", "report_con", "report_mvp"]), 
             ).order_by(DebateMessage.created_at.asc(), DebateMessage.message_id.asc())
             msg_result = await db.execute(msg_query)
             messages = msg_result.scalars().all()
@@ -409,6 +409,7 @@ class DebateService:
             summary = None
             pro_eval = None
             con_eval = None
+            best_player = None
 
             for msg in messages:
                 if msg.display_type == "report_summary":
@@ -423,6 +424,8 @@ class DebateService:
                         con_eval = json.loads(msg.content)
                     except Exception:
                         con_eval = None
+                elif msg.display_type == "report_mvp":
+                    best_player = msg.content
 
             pro_score = None
             con_score = None
@@ -447,6 +450,7 @@ class DebateService:
                 "pro_score": pro_score,
                 "con_score": con_score,
                 "summary": summary,
+                "best_player": best_player,
             })
 
         verdicts.sort(key=lambda item: (item["rating"], item["finished_at"] or datetime.min), reverse=True)
