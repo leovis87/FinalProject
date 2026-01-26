@@ -152,12 +152,12 @@
 .sidebar-level-badge {
     display: inline-flex;
     align-items: center;
-    background-color: rgba(37, 99, 235, 0.1);
-    color: var(--point-main-color, #2563eb);
+    background-color: #f8fafc;
     font-size: 11px;
     font-weight: 700;
     padding: 2px 8px;
-    border-radius: 6px;
+    border-radius: 10px;
+    border: 1px solid #cbd5e1;
     width: fit-content;
 }
 
