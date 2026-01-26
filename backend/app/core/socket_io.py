@@ -49,7 +49,7 @@ from models.enums import DebateStatus, DebateRole, DebateResult, DebateDecisionB
 from schemas.debate import DebateResultUpsertRequest, DebateResultItem
 from services.debate import debate_service
 
-sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=["http://61.40.108.149:5173", "http://localhost:5173"])
+sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 sio_app = socketio.ASGIApp(sio)
 
 _room_states: Dict[str, dict] = {}

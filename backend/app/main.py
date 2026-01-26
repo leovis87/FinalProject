@@ -11,14 +11,12 @@ app = FastAPI(lifespan=lifespan)
 # CORS 설정 추가
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://61.40.108.149:5173"  # 외부 IP 프론트엔드 허용 추가
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 app.include_router(user.router)
 app.include_router(debate.router)

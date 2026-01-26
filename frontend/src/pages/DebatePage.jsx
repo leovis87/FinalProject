@@ -99,7 +99,11 @@ function DebatePage() {
     useEffect(() => {
         if (!currentUser?.user_id || socketRef.current) return;
 
-        const socket = io({ path: "/socket.io" });
+        const socket = io({ 
+            path: "/socket.io",
+            transports: ["websocket", "polling"], // 웹소켓 우선 연결 시도
+            withCredentials: true
+        });
         socketRef.current = socket;
 
         socket.on("connect", () => {
