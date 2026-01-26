@@ -9,9 +9,16 @@ import {
     RiRestartLine,
     RiFilePaper2Line,
     RiEmotionHappyLine,
-    RiEmotionUnhappyLine
+    RiEmotionUnhappyLine,
+    RiMedalLine,
+    RiFileTextLine,
+    RiBarChartFill,
+    RiInformationLine,
+    RiRobot2Line
 } from "react-icons/ri";
 import "../styles/HistoryPage.css";
+// 리플레이 메시지 카드 스타일을 위해 DebatePage CSS도 함께 사용
+import "../styles/DebatePage.css";
 
 // --- 1. 메인 페이지 컴포넌트 ---
 function HistoryPage() {
@@ -154,7 +161,29 @@ function HistoryPage() {
             });
             if(!response.ok) throw new Error("리플레이 로드 실패");
             const data = await response.json();
-            setReplayMessages(Array.isArray(data) ? data : []);
+            
+            // 데이터 파싱 및 매핑 로직 강화
+            const messages = Array.isArray(data) ? data.map(msg => {
+                let parsedContent = msg.content;
+                // JSON 문자열인 경우 객체로 파싱
+                if (typeof msg.content === 'string' && (msg.content.startsWith('{') || msg.content.startsWith('['))) {
+                    try {
+                        parsedContent = JSON.parse(msg.content);
+                    } catch (e) {
+                        // 파싱 실패시 원본 유지
+                    }
+                }
+
+                return {
+                    ...msg,
+                    content: parsedContent,
+                    // display_type(DB)을 camelCase로 매핑하거나 fallback
+                    displayType: msg.display_type || (msg.role === 'ai' ? 'moderator' : 'user'),
+                    nickname: msg.user_name || (msg.role === 'ai' ? 'AI 사회자' : '참가자')
+                };
+            }) : [];
+
+            setReplayMessages(messages);
             setReplayStatus("success");
         } catch (e) {
             setReplayError(e.message);
@@ -444,12 +473,7 @@ function ReplayModal({ record, status, error, messages, onClose }) {
                     {status === 'loading' && <div className="loading-state">대화 내용을 불러오는 중...</div>}
                     {status === 'error' && <div className="error-text">{error}</div>}
                     {status === 'success' && messages.map((msg, idx) => (
-                        <div key={msg.id || idx} className={`chat-bubble-row ${msg.role}`}>
-                            <div className="chat-sender">{msg.user_name || (msg.role === 'ai' ? 'AI 사회자' : '참가자')}</div>
-                            <div className={`chat-bubble ${msg.role}`}>
-                                {typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}
-                            </div>
-                        </div>
+                        <ReplayMessageRow key={msg.id || idx} msg={msg} />
                     ))}
                 </div>
             </div>
@@ -523,6 +547,182 @@ function PersonalFeedbackModal({ item, onClose }) {
                     )}
                 </div>
             </div>
+        </div>
+    );
+}
+
+// ----------------------------------------------------------------------
+// 4. 리플레이용 메시지 컴포넌트 (DebatePage에서 이식)
+// ----------------------------------------------------------------------
+
+function ReplayMessageRow({ msg }) {
+    // 1) 시스템 메시지
+    if (msg.displayType === 'system') {
+        return <div className="system-message"><span>{msg.content}</span></div>;
+    }
+
+    // 2) 개인 피드백
+    if (msg.displayType === 'report_user') {
+        return <PersonalFeedbackCard data={msg.content} />;
+    }
+    
+    // 3) 요약 카드
+    if (msg.displayType === 'summary_round') return <SummaryRoundCard data={msg.content} />;
+    if (msg.displayType === 'summary_topic') return <SummaryTopicCard data={msg.content} />;
+    if (msg.displayType === 'summary_pro' || msg.displayType === 'summary_con') {
+        const tone = msg.displayType === 'summary_pro' ? 'pro' : 'con';
+        return <SummaryListCard title={msg.content?.title} items={msg.content?.items} tone={tone} />;
+    }
+
+    // 4) 전체 총평
+    if (msg.displayType === 'report_summary') return (
+        <div className="report-item summary">
+            <div className="report-tag"><RiFileTextLine /> 전체 총평</div>
+            <div className="report-content">{typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}</div>
+        </div>
+    );
+
+    // 5) 팀 평가
+    if (msg.displayType === 'report_pro' || msg.displayType === 'report_con') {
+        const type = msg.displayType === 'report_pro' ? 'pro' : 'con';
+        return <TeamResultCard title={type === 'pro' ? '찬성 팀' : '반대 팀'} data={msg.content} type={type} />;
+    }
+
+    // 6) MVP
+    if (msg.displayType === 'report_mvp') return (
+        <div className="report-item mvp">
+            <div className="mvp-announcement">
+                <RiMedalLine className="mvp-icon" />
+                <span>이번 토론의 MVP는 <strong>{msg.content}</strong>님입니다! 축하드립니다! 🏆</span>
+            </div>
+        </div>
+    );
+
+    // 7) 일반 사회자 메시지
+    if (msg.displayType === 'moderator' || msg.role === 'ai') return (
+        <div className="message-row moderator">
+            <div className="msg-avatar mod"><RiRobot2Line /></div>
+            <div className="msg-bubble mod">
+                {typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}
+            </div>
+        </div>
+    );
+
+    // 8) 일반 사용자 메시지
+    return (
+        <div className={`chat-bubble-row ${msg.role}`}>
+            <div className="chat-sender">{msg.nickname}</div>
+            <div className={`chat-bubble ${msg.role}`}>
+                {typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}
+            </div>
+        </div>
+    );
+}
+
+// --- 보조 UI 카드 컴포넌트들 ---
+
+function PersonalFeedbackCard({ data }) {
+    if (!data) return null;
+    return (
+        <div className="report-item personal-feedback">
+            <div className="report-tag">개인 피드백</div>
+            {data.strength && (
+                <div className="personal-feedback-section">
+                    <div className="personal-feedback-title">강점</div>
+                    <ul>{data.strength.map((t, i) => <li key={i}>{t}</li>)}</ul>
+                </div>
+            )}
+            {data.weakness && (
+                <div className="personal-feedback-section">
+                    <div className="personal-feedback-title">보완점</div>
+                    <ul>{data.weakness.map((t, i) => <li key={i}>{t}</li>)}</ul>
+                </div>
+            )}
+            {data.recommended_reading && (
+                <div className="personal-feedback-section">
+                    <div className="personal-feedback-title">추천 학습</div>
+                    <div className="personal-feedback-text">{data.recommended_reading}</div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function SummaryRoundCard({ data }) {
+    const title = data?.title || '라운드 요약';
+    const proItems = Array.isArray(data?.pro_items) ? data.pro_items : [];
+    const conItems = Array.isArray(data?.con_items) ? data.con_items : [];
+    return (
+        <div className="report-item summary round">
+            <div className="report-tag"><RiFileTextLine /> {title}</div>
+            <div className="summary-round-grid">
+                <div className="summary-round-col pro">
+                    <div className="summary-round-title">찬성측 입장 요약</div>
+                    {proItems.length === 0 ? <div className="summary-round-empty">내용 없음</div> : (
+                        <ol className="summary-list">{proItems.map((item, index) => <li key={index}>{item}</li>)}</ol>
+                    )}
+                </div>
+                <div className="summary-round-col con">
+                    <div className="summary-round-title">반대측 입장 요약</div>
+                    {conItems.length === 0 ? <div className="summary-round-empty">내용 없음</div> : (
+                        <ol className="summary-list">{conItems.map((item, index) => <li key={index}>{item}</li>)}</ol>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function SummaryTopicCard({ data }) {
+    return (
+        <div className="report-item summary topic">
+            <div className="report-tag"><RiFileTextLine /> {data?.title || "토론 주제 요약"}</div>
+            {data?.summary && <div className="report-content">{data.summary}</div>}
+        </div>
+    );
+}
+
+function SummaryListCard({ title, items, tone }) {
+    const list = Array.isArray(items) ? items : [];
+    return (
+        <div className={`report-item summary list ${tone}`}>
+            <div className="report-tag"><RiFileTextLine /> {title || '입장 요약'}</div>
+            {list.length === 0 ? <div className="report-content">내용 없음</div> : (
+                <ol className="summary-list">{list.map((item, i) => <li key={i}>{item}</li>)}</ol>
+            )}
+        </div>
+    );
+}
+
+function TeamResultCard({ title, data, type }) {
+    if (!data) return null;
+    return (
+        <div className={`team-result-card ${type}`}>
+            <div className="res-header">
+                <span className="team-name">{title}</span>
+                <span className="total-score">{data.total_score}점</span>
+            </div>
+            <div className="score-bars">
+                <ScoreBar label="주장 명확성" val={data.scores?.clarity} max={25} />
+                <ScoreBar label="근거 적합성" val={data.scores?.evidence} max={30} />
+                <ScoreBar label="상호작용" val={data.scores?.interaction} max={25} />
+                <ScoreBar label="토론 태도" val={data.scores?.attitude} max={20} />
+            </div>
+            <div className="feedback-body">
+                <div className="fb-label"><RiInformationLine /> 상세 평가 이유</div>
+                <div className="fb-text">{data.feedback_text}</div>
+            </div>
+        </div>
+    );
+}
+
+function ScoreBar({ label, val, max }) {
+    const percent = (val / max) * 100;
+    return (
+        <div className="score-row">
+            <span className="label">{label}</span>
+            <div className="bar-bg"><div className="bar-fill" style={{width: `${percent}%`}}></div></div>
+            <span className="val">{val}</span>
         </div>
     );
 }

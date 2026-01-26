@@ -303,6 +303,12 @@
 }
 
 /* 모달 내부 스타일 */
+/* [추가됨] 리플레이 모달 너비 확장 */
+.modal-content.replay-modal {
+    width: 800px;
+    max-width: 95vw;
+}
+
 .modal-header-simple {
     text-align: center;
     margin-bottom: 20px;
