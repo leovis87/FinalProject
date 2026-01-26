@@ -666,4 +666,16 @@ class DebateService:
         user.badges = current_badges
         # user 객체는 호출한 쪽(set_debate_results)에서 add/commit 됨
 
+    async def like_participant(self, db: AsyncSession, to_user_id: int) -> int:
+        query = select(User).where(User.user_id == to_user_id)
+        result = await db.execute(query)
+        user = result.scalar_one_or_none()
+        
+        if user:
+            user.likes_received += 1
+            await db.commit()
+            await db.refresh(user)
+            return user.likes_received
+        return 0
+
 debate_service = DebateService()

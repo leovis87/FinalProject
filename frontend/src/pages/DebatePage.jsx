@@ -33,6 +33,9 @@ function DebatePage() {
     const [turnRemaining, setTurnRemaining] = useState(null);
     const [selectionRemaining, setSelectionRemaining] = useState(null);
     const [hasRaised, setHasRaised] = useState(false);
+
+    // ⭐ [신규] 중복 추천 방지를 위한 상태 (내가 이번 판에 누구를 찍었는지 저장)
+    const [likedUserIds, setLikedUserIds] = useState(new Set());
     
     // 실시간 상태 관리 (라운드, 턴 정보)
     const [roundInfo, setRoundInfo] = useState({
@@ -48,6 +51,32 @@ function DebatePage() {
 
     const socketRef = useRef(null);
     const chatEndRef = useRef(null);
+
+    // ⭐ [신규] 추천(좋아요) 핸들러 함수
+    const handleLike = (toUserId) => {
+        if (!socketRef.current) return;
+        
+        // 본인 추천 방지
+        if (String(toUserId) === String(currentUser?.user_id)) {
+            alert("본인에게는 추천을 할 수 없습니다.");
+            return;
+        }
+
+        // 중복 추천 방지 (클라이언트 측 체크)
+        if (likedUserIds.has(toUserId)) {
+            alert("이미 이 참가자를 추천하셨습니다.");
+            return;
+        }
+
+        // 서버에 추천 이벤트 전송
+        socketRef.current.emit("give_like", {
+            room_id: roomId,
+            to_user_id: toUserId
+        });
+
+        // 추천 목록에 추가하여 재추천 방지
+        setLikedUserIds(prev => new Set(prev).add(toUserId));
+    };
 
     // 1. 초기 방 정보 가져오기
     useEffect(() => {
@@ -70,8 +99,7 @@ function DebatePage() {
     useEffect(() => {
         if (!currentUser?.user_id || socketRef.current) return;
 
-        const socket = io({ path: "/socket.io",
-        });
+        const socket = io({ path: "/socket.io" });
         socketRef.current = socket;
 
         socket.on("connect", () => {
@@ -82,16 +110,27 @@ function DebatePage() {
             setDebateStarted(true);
         });
 
+        // ⭐ [신규] 실시간 추천 수 업데이트 리스너
+        socket.on("like_update", (data) => {
+            setRoom(prev => {
+                if (!prev) return prev;
+                const newParticipants = prev.participants.map(p => 
+                    String(p.user_id) === String(data.user_id) 
+                    ? { ...p, likes_received: data.likes_received } 
+                    : p
+                );
+                return { ...prev, participants: newParticipants };
+            });
+        });
+
         // 서버의 debate_update 이벤트 처리
         socket.on("debate_update", (data) => {
             console.log("📩 실시간 업데이트:", data);
 
-            // ⭐ [해결] 발언권 문제 해결: 업데이트 데이터가 오고 라운드가 1 이상이면 토론 진행 중으로 간주
             if (data.current_round > 0) {
                 setDebateStarted(true);
             }
 
-            // 라운드 및 차례 정보 업데이트
             setRoundInfo({
                 currentRound: data.current_round,
                 turnIndex: data.turn_index,
@@ -103,7 +142,6 @@ function DebatePage() {
                 selectionRound: data.selection_round ?? null
             });
 
-            // 메시지 목록 업데이트
             if (data.messages) {
                 const formatted = data.messages.map((m, idx) => ({
                     id: m.id || `${Date.now()}-${idx}`,
@@ -112,7 +150,6 @@ function DebatePage() {
                     turn: m.turn ?? null,
                     nickname: m.user_name || (m.role === 'ai' ? 'AI 사회자' : '알 수 없음'),
                     content: m.content,
-                    // 서버에서 display_type이 없으면 role 기준으로 기본값 설정
                     displayType: m.display_type || (m.role === 'ai' ? 'moderator' : (m.role === 'system' ? 'system' : 'user'))
                 }));
 
@@ -126,15 +163,12 @@ function DebatePage() {
                                 next = next.filter((item) => item.displayType !== 'loading');
                                 return;
                             }
-
                             if (msg.displayType === 'loading') {
                                 next = next.filter((item) => item.displayType !== 'loading');
                                 next.push(msg);
                                 return;
                             }
-
                             next = next.filter((item) => item.displayType !== 'loading');
-
                             if (msg.displayType !== 'draft' && msg.userId && msg.turn !== null) {
                                 next = next.filter((item) => !(
                                     item.displayType === 'draft' &&
@@ -149,7 +183,6 @@ function DebatePage() {
                 }
             }
         });
-
 
         socket.on("participants_update", (data) => {
             if (!data?.participants) return;
@@ -169,7 +202,7 @@ function DebatePage() {
             socket.disconnect();
             socketRef.current = null;
         };
-    }, [currentUser?.user_id, refreshUser]);
+    }, [currentUser?.user_id, refreshUser, roomId]);
 
     useEffect(() => {
         const socket = socketRef.current;
@@ -194,7 +227,6 @@ function DebatePage() {
         };
     }, [roomId, currentUser?.user_id]);
 
-    // 새 메시지 올 때마다 자동 스크롤
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
@@ -249,7 +281,6 @@ function DebatePage() {
         setHasRaised(false);
     }, [roundInfo.selectionRound, roundInfo.selectionActive]);
 
-    // 토론 시작 (방장용)
     const handleEndDebate = () => {
         if (!socketRef.current) return;
         if (!window.confirm("토론을 종료하시겠습니까?")) return;
@@ -283,7 +314,6 @@ function DebatePage() {
         });
     };
 
-    // 메시지 전송
     const handleSendMessage = (e) => {
         e.preventDefault();
         if (!messageInput.trim() || !socketRef.current) return;
@@ -306,7 +336,6 @@ function DebatePage() {
         return `${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
     };
 
-    // 내 차례인지 확인하는 로직 (input 비활성화 해제용)
     const participants = room?.participants ?? [];
     const isMyTurn = roundInfo.nextSpeaker && String(roundInfo.nextSpeaker.user_id) === String(currentUser?.user_id);
     const isCreator = currentUser && parseInt(room?.creator_id) === parseInt(currentUser.user_id);
@@ -329,10 +358,20 @@ function DebatePage() {
 
     return (
         <div className="debate-container">
-            {/* 왼쪽 사이드바: 참가자 목록 */}
+            {/* 왼쪽 사이드바: 참가자 목록 (handleLike 전달) */}
             <aside className="participants-sidebar">
-                <TeamSection title="찬성 TEAM" type="pro" members={participants.filter((p) => p.role === "pro")} />
-                <TeamSection title="반대 TEAM" type="con" members={participants.filter((p) => p.role === "con")} />
+                <TeamSection 
+                    title="찬성 TEAM" 
+                    type="pro" 
+                    members={participants.filter((p) => p.role === "pro")} 
+                    onLike={handleLike} 
+                />
+                <TeamSection 
+                    title="반대 TEAM" 
+                    type="con" 
+                    members={participants.filter((p) => p.role === "con")} 
+                    onLike={handleLike} 
+                />
             </aside>
 
             <main className="center-main-area">
@@ -361,7 +400,6 @@ function DebatePage() {
                     </div>
                 </header>
 
-                {/* AI 사회자 상태바 - 현재 진행 상황 표시 */}
                 <div className="moderator-status-bar">
                     <div className="mod-icon"><RiRobot2Line /></div>
                     <div className="mod-content">
@@ -386,7 +424,6 @@ function DebatePage() {
                     </div>
                 </div>
 
-                {/* 채팅창 */}
                 <div className="chat-window">
                     {messages.map((msg) => (
                         <MessageRow key={msg.id} msg={msg} isMe={msg.nickname === currentUser?.nickname} />
@@ -394,7 +431,6 @@ function DebatePage() {
                     <div ref={chatEndRef} />
                 </div>
 
-                {/* 입력창 - 내 차례가 아니면 비활성화 */}
                 <form className="input-area" onSubmit={handleSendMessage}>
                     <div className="turn-indicator">
                         {debateEnded ? <span className="not-my-turn">토론이 종료되었습니다.</span>
@@ -438,7 +474,7 @@ function DebatePage() {
     );
 }
 
-// 컴포넌트 분리: 메시지 행 (여기서 찢어서 출력 처리)
+// 컴포넌트 분리: 메시지 행
 function MessageRow({ msg, isMe }) {
     if (msg.displayType === 'system') return <div className="system-message"><span>{msg.content}</span></div>;
 
@@ -447,7 +483,6 @@ function MessageRow({ msg, isMe }) {
         return <PersonalFeedbackCard data={feedback} />;
     }
     
-    // ⭐ [신규] 요약 카드: 라운드/주제 요약
     if (msg.displayType === 'summary_round') {
         return <SummaryRoundCard data={msg.content} />;
     }
@@ -461,7 +496,6 @@ function MessageRow({ msg, isMe }) {
         return <SummaryListCard title={msg.content?.title} items={msg.content?.items} tone={tone} />;
     }
 
-    // ⭐ [신규] 찢어서 출력하기 1: 전체 총평 요약 (display_type: report_summary)
     if (msg.displayType === 'report_summary') return (
         <div className="report-item summary">
             <div className="report-tag"><RiFileTextLine /> 전체 총평</div>
@@ -469,14 +503,11 @@ function MessageRow({ msg, isMe }) {
         </div>
     );
 
-    // ⭐ [신규] 찢어서 출력하기 2: 팀 평가 (display_type: report_pro / report_con)
-    // content가 객체(JSON)로 오므로 키 값을 직접 참조함
     if (msg.displayType === 'report_pro' || msg.displayType === 'report_con') {
         const type = msg.displayType === 'report_pro' ? 'pro' : 'con';
         return <TeamResultCard title={type === 'pro' ? '찬성 팀' : '반대 팀'} data={msg.content} type={type} />;
     }
 
-    // ⭐ [신규] 찢어서 출력하기 3: MVP 선정 (display_type: report_mvp)
     if (msg.displayType === 'report_mvp') return (
         <div className="report-item mvp">
             <div className="mvp-announcement">
@@ -486,7 +517,6 @@ function MessageRow({ msg, isMe }) {
         </div>
     );
 
-    // 일반 사회자 메시지
     if (msg.displayType === 'draft') return (
         <div className={`message-row ${msg.role} draft ${isMe ? 'me' : ''}`}>
             {!isMe && (
@@ -525,7 +555,6 @@ function MessageRow({ msg, isMe }) {
         </div>
     );
 
-    // 일반 사용자 메시지
     return (
         <div className={`message-row ${msg.role} ${isMe ? 'me' : ''}`}>
             {!isMe && (
@@ -541,7 +570,7 @@ function MessageRow({ msg, isMe }) {
     );
 }
 
-// 팀별 평가 카드 (객체 키-값 접근 핵심)
+// 팀별 평가 카드
 function TeamResultCard({ title, data, type }) {
     return (
         <div className={`team-result-card ${type}`}>
@@ -550,7 +579,6 @@ function TeamResultCard({ title, data, type }) {
                 <span className="total-score">{data.total_score}점</span>
             </div>
             
-            {/* 항목별 세부 점수 바 (scores 키 참조) */}
             <div className="score-bars">
                 <ScoreBar label="주장 명확성" val={data.scores.clarity} max={25} />
                 <ScoreBar label="근거 적합성" val={data.scores.evidence} max={30} />
@@ -558,7 +586,6 @@ function TeamResultCard({ title, data, type }) {
                 <ScoreBar label="토론 태도" val={data.scores.attitude} max={20} />
             </div>
 
-            {/* 상세 피드백 (feedback_text 키 참조) */}
             <div className="feedback-body">
                 <div className="fb-label"><RiInformationLine /> 상세 평가 이유</div>
                 <div className="fb-text">{data.feedback_text}</div>
@@ -755,7 +782,6 @@ function PersonalFeedbackCard({ data }) {
     );
 }
 
-// 점수 바 컴포넌트
 function ScoreBar({ label, val, max }) {
     const percent = (val / max) * 100;
     return (
@@ -768,7 +794,7 @@ function ScoreBar({ label, val, max }) {
 }
 
 // 사이드바 팀 섹션
-function TeamSection({ title, type, members }) {
+function TeamSection({ title, type, members, onLike }) {
     return (
         <div className={`team-section ${type}`}>
             <div className={`team-header-card ${type}`}>
@@ -784,6 +810,15 @@ function TeamSection({ title, type, members }) {
                         <div className="participant-info">
                             <span className="nickname">{p.nickname}</span>
                             <span className="role-badge">{type === 'pro' ? '찬성' : '반대'} 토론자</span>
+                            
+                            {/* 추천 버튼 추가: 관전자를 포함한 누구나 클릭 가능 */}
+                            <button 
+                                className="like-action-btn" 
+                                onClick={() => onLike(p.user_id)}
+                                title="이 토론자 추천하기"
+                            >
+                                ❤️ <span className="like-count">{p.likes_received || 0}</span>
+                            </button>
                         </div>
                     </div>
                 ))}

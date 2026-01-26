@@ -1677,3 +1677,21 @@ async def disconnect(sid):
     payload = _debug_payload("info", "DISCONNECT", None, None, f"sid={sid}")
     _debug_print(payload)
     await _emit_debug(payload, None, sid=sid)
+
+@sio.on("give_like")
+async def handle_give_like(sid, data):
+    room_id = data.get("room_id")
+    to_user_id = data.get("to_user_id")
+    
+    if not room_id or not to_user_id:
+        return
+
+    async with AsyncSessionLocal() as db:
+        # 서비스 호출하여 DB 업데이트
+        new_total = await debate_service.like_participant(db, int(to_user_id))
+        
+        # 해당 방의 모든 사람(관전자 포함)에게 실시간 수치 전송
+        await sio.emit("like_update", {
+            "user_id": to_user_id,
+            "likes_received": new_total
+        }, room=f"debate_{room_id}")
