@@ -388,3 +388,67 @@
     opacity: 0;
     animation: fadeInUp 0.3s ease-out 0.3s forwards; /* 0.3초 딜레이 */
 }
+
+@media (max-width: 768px) {
+    /* 1. 배너 영역 */
+    .find-banner-card {
+        padding: 24px;
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .find-banner-header h2 {
+        font-size: 22px;
+    }
+
+    /* 2. 필터 영역 */
+    .find-filter-card {
+        padding: 20px;
+    }
+    
+    .filter-btn-group {
+        gap: 6px;
+    }
+    
+    .filter-chip {
+        padding: 6px 12px;
+        font-size: 13px;
+    }
+
+    /* 3. 토론방 리스트 아이템 */
+    .find-room-item {
+        flex-direction: column; /* 세로 배치 */
+        align-items: flex-start;
+        gap: 16px;
+        padding: 20px;
+    }
+
+    .room-icon-wrapper {
+        width: 48px;
+        height: 48px;
+        font-size: 20px;
+    }
+
+    .room-info-content {
+        padding-right: 0; /* 우측 여백 제거 */
+        width: 100%;
+    }
+
+    .room-item-title {
+        font-size: 16px;
+    }
+
+    /* 상태 뱃지 위치 조정 */
+    .room-right-action {
+        position: static; /* 절대 위치 해제 */
+        margin-top: 4px;
+        width: 100%;
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .status-badge {
+        font-size: 11px;
+        padding: 4px 10px;
+    }
+}

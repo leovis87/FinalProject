@@ -413,3 +413,40 @@
     transform: none;
     box-shadow: none;
 }
+
+@media (max-width: 768px) {
+    .create-container {
+        padding: 20px; /* 좌우 여백 축소 */
+    }
+
+    .create-card {
+        padding: 24px 20px;
+    }
+
+    /* 가로 배치된 폼 그룹을 세로로 변경 */
+    .form-row {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .create-title {
+        font-size: 22px;
+    }
+
+    .create-subtitle {
+        font-size: 15px;
+    }
+    
+    /* 토글 카드 영역 */
+    .toggle-card {
+        padding: 16px;
+    }
+    
+    .toggle-title {
+        font-size: 15px;
+    }
+    
+    .toggle-desc {
+        font-size: 12px;
+    }
+}

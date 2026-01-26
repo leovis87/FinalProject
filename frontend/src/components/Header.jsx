@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { RiTrophyLine, RiStarLine, RiFlashlightLine } from "react-icons/ri";
+import { RiTrophyLine, RiStarLine, RiFlashlightLine, RiMenuLine } from "react-icons/ri"; // RiMenuLine 추가
 import Logo from "./Logo";
 
-function Header() {
+// onMenuClick props 추가
+function Header({ onMenuClick }) {
     const { isAuthenticated, user } = useAuth();
 
     return (
@@ -11,9 +12,15 @@ function Header() {
             {isAuthenticated ? (
                 // 로그인 상태
                 <>
-                    <Link to="/">
-                        <Logo />
-                    </Link>
+                    <div className="header-left-group">
+                        {/* 모바일 메뉴 버튼 (CSS로 제어) */}
+                        <button className="mobile-menu-btn" onClick={onMenuClick}>
+                            <RiMenuLine />
+                        </button>
+                        <Link to="/">
+                            <Logo />
+                        </Link>
+                    </div>
 
                     <div className="header-right-tools">
                         <div className="header-badge level">
@@ -42,15 +49,4 @@ function Header() {
     )
 }
 
-function getTierClass(tierName) {
-    switch(tierName) {
-        case "옹알이": return "tier-ong";
-        case "입문자": return "tier-beginner";
-        case "아마추어": return "tier-amateur";
-        case "프로": return "tier-pro";
-        case "마스터": return "tier-master";
-        default: return "";
-    }
-}
-
-export default Header
+export default Header;
