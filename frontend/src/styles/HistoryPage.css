@@ -1,0 +1,378 @@
+/* HistoryPage.css */
+
+/* 상단 배너 카드 (VerdictsPage 스타일 차용) */
+.history-banner-card {
+    background-color: var(--color-surface);
+    border: 3px solid var(--color-primary);
+    border-radius: 10px;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-under);
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.history-banner-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.history-icon-box {
+    width: 52px;
+    height: 52px;
+    background-color: var(--color-primary);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    color: var(--color-secondary);
+    box-shadow: 0 4px 12px rgba(30, 58, 138, 0.2);
+}
+
+.history-main-title {
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--color-primary);
+    margin: 0;
+    letter-spacing: -1px;
+}
+
+.history-sub-desc {
+    font-size: 16px;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+/* 필터 바 */
+.history-filter-bar {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    gap: 16px;
+    margin-top: 24px;
+}
+
+.search-input-box.small {
+    max-width: 300px;
+}
+
+.search-input-box.full-width {
+    width: 100%;
+    max-width: 100%;
+}
+
+.filter-group-row {
+    display: flex;
+    gap: 12px;
+}
+
+.select-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.filter-icon-small {
+    position: absolute;
+    left: 12px;
+    color: #64748b;
+    z-index: 1;
+}
+
+.filter-select {
+    padding: 10px 16px 10px 36px;
+    border-radius: 10px;
+    border: 1px solid var(--card-border);
+    background-color: white;
+    color: #475569;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.filter-select:hover {
+    border-color: #cbd5e1;
+}
+
+/* 토론 기록 리스트 (그리드) */
+.history-list-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.history-card-item {
+    background-color: white;
+    border-radius: 16px;
+    border: var(--card-border);
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 150px 1fr 200px;
+    align-items: center;
+    gap: 20px;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.history-card-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+    border-color: var(--color-primary);
+}
+
+.history-card-top {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.history-date {
+    font-size: 13px;
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+.result-badge-small {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 800;
+    text-align: center;
+    width: fit-content;
+    border: 3px solid transparent; /* 기본 테두리 설정 */
+}
+
+.result-badge-small.win { background-color: #dcfce7; color: #15803d; border-color: #86efac; }
+.result-badge-small.lose { background-color: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+.result-badge-small.draw { background-color: #f1f5f9; color: #64748b; border-color: #cbd5e1; }
+
+.history-card-main {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.history-item-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+}
+
+.history-role-info {
+    font-size: 14px;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.role-pill {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 12px;
+}
+.role-pill.pro { background-color: #eff6ff; color: #1d4ed8; }
+.role-pill.con { background-color: #fef2f2; color: #b91c1c; }
+
+.history-card-footer {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.history-action-btn {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+
+.history-action-btn.outline {
+    background: white;
+    border: 1px solid #64748b;
+    color: #64748b;
+}
+
+.history-action-btn.outline:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.history-action-btn.primary {
+    background: #eff6ff;
+    border: 1px solid #dbeafe;
+    color: #1d4ed8;
+}
+
+.history-action-btn.primary:hover {
+    background: #dbeafe;
+}
+
+/* 피드백 그리드 */
+.feedback-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.feedback-card {
+    background: white;
+    border: var(--card-border);
+    border-radius: 16px;
+    padding: 24px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+}
+
+.feedback-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+    border-color: var(--color-primary);
+}
+
+.feedback-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.feedback-result-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    border: 3px solid transparent;
+}
+
+.feedback-result-icon.win { background-color: #dcfce7; color: #15803d; border-color: #86efac; }
+.feedback-result-icon.lose { background-color: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+
+.feedback-meta {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+}
+
+.feedback-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 12px 0;
+    line-height: 1.4;
+}
+
+.feedback-preview-box {
+    background-color: #f8fafc;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #475569;
+    margin-bottom: 16px;
+    flex: 1;
+}
+
+.feedback-footer-link {
+    font-size: 13px;
+    color: var(--color-primary);
+    font-weight: 700;
+    text-align: right;
+}
+
+/* 모달 내부 스타일 */
+.modal-header-simple {
+    text-align: center;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 16px;
+}
+
+.modal-header-simple h2 { font-size: 20px; margin: 0 0 4px 0; }
+.modal-header-simple p { color: #64748b; font-size: 14px; margin: 0; }
+
+.replay-body-scroll, .verdict-scroll-body, .modal-scroll-body {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+/* 챗 버블 스타일 (리플레이용) */
+.chat-bubble-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.chat-bubble-row.ai { align-items: center; }
+.chat-bubble-row.pro { align-items: flex-start; }
+.chat-bubble-row.con { align-items: flex-end; }
+
+.chat-sender { font-size: 12px; color: #94a3b8; margin: 0 4px; }
+
+.chat-bubble {
+    padding: 8px 14px;
+    border-radius: 12px;
+    font-size: 14px;
+    max-width: 80%;
+    line-height: 1.5;
+}
+
+.chat-bubble.ai { background-color: #f1f5f9; color: #475569; text-align: center; }
+.chat-bubble.pro { background-color: #eff6ff; color: #1e3a8a; border-radius: 4px 12px 12px 12px; }
+.chat-bubble.con { background-color: #fef2f2; color: #991b1b; border-radius: 12px 4px 12px 12px; }
+
+/* 피드백 모달 블록 */
+.feedback-block {
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+}
+
+.feedback-block.good { background-color: #f0fdf4; border: 1px solid #bbf7d0; }
+.feedback-block.bad { background-color: #fff1f2; border: 1px solid #fecdd3; }
+.feedback-block.info { background-color: #f8fafc; border: 1px solid var(--card-border); }
+
+.feedback-block h3 { margin: 0 0 10px 0; font-size: 15px; }
+.feedback-block ul { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.6; }
+.feedback-block p { margin: 0; font-size: 14px; line-height: 1.6; }
+
+@media (max-width: 768px) {
+    .history-card-item {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .history-card-footer {
+        justify-content: stretch;
+    }
+    .history-action-btn {
+        flex: 1;
+        justify-content: center;
+    }
+    .feedback-grid {
+        grid-template-columns: 1fr;
+    }
+}
