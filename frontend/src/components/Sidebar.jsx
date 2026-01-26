@@ -23,8 +23,28 @@ function Sidebar() {
                             </div>
                             <div className="sidebar-profile-text">
                                 <div className="sidebar-nickname">{user.nickname}</div>
-                                <div className="sidebar-level-badge">
-                                    Lv. {user.level || 1}
+                                {/* 레벨과 배지를 한 줄에 배치 */}
+                                <div className="sidebar-status-row" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                                    <div className="sidebar-level-badge">
+                                        Lv. {user.level || 1}
+                                    </div>
+                                    {user.equipped_badge && (
+                                        <div className="sidebar-equipped-badge" style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            padding: '2px 8px',
+                                            borderRadius: '10px',
+                                            backgroundColor: '#f8fafc',
+                                            border: '1px solid #cbd5e1',
+                                            fontSize: '0.75rem',
+                                            color: '#475569',
+                                            fontWeight: '600'
+                                        }}>
+                                            <span>{user.equipped_badge.icon}</span>
+                                            <span>{user.equipped_badge.name}</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

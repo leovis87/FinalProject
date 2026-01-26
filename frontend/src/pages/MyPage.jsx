@@ -59,8 +59,8 @@ const BADGE_CONFIG = [
 ];
 
 function MyPage() {
-    const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState("summary"); // 'summary' | 'badge'
+    const { user, updateEquippedBadge } = useAuth();
+    const [activeTab, setActiveTab] = useState("summary"); 
     const [historyRecords, setHistoryRecords] = useState([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
@@ -88,7 +88,6 @@ function MyPage() {
         const fetchHistory = async () => {
             setIsLoadingHistory(true);
             try {
-                // API 함수가 없으면 빈 배열 처리 (debateApi.getHistory 구현 필요)
                 const data = debateApi.getHistory ? await debateApi.getHistory() : [];
                 
                 const mapped = (Array.isArray(data) ? data : []).map(item => ({
@@ -137,21 +136,34 @@ function MyPage() {
 
     // --- 배지 현황 매핑 ---
     const myBadges = useMemo(() => {
-        const userBadges = user?.badges || []; // userBadges는 [{name: "...", acquired_at: "..."}] 형태 가정
+        const userBadges = user?.badges || [];
+        const equippedBadge = user?.equipped_badge; // 객체 {name, icon} 또는 null
         
         return BADGE_CONFIG.map((config) => {
-            // 이름이 일치하는 배지를 찾음
             const earnedBadge = userBadges.find((b) => b.name === config.name);
             
             return {
                 ...config,
-                earned: !!earnedBadge, // 획득 여부
-                acquired_at: earnedBadge ? earnedBadge.acquired_at : null
+                earned: !!earnedBadge,
+                acquired_at: earnedBadge ? earnedBadge.acquired_at : null,
+                // [수정됨] 이름으로 비교하여 장착 여부 판단
+                isEquipped: equippedBadge?.name === config.name
             };
         });
     }, [user]);
 
-    // 날짜 포맷팅 헬퍼
+    // [수정됨] 배지 장착 핸들러
+    const handleEquipBadge = (badge) => {
+        if (!badge.earned) return; 
+        
+        if (badge.isEquipped) {
+            updateEquippedBadge(null); // 해제
+        } else {
+            // 이름과 아이콘 정보를 객체로 저장
+            updateEquippedBadge({ name: badge.name, icon: badge.icon }); 
+        }
+    };
+
     const formatDate = (isoString) => {
         if (!isoString) return "";
         const date = new Date(isoString);
@@ -248,7 +260,6 @@ function MyPage() {
                 <div className="tab-content">
                     {activeTab === 'summary' ? (
                         <div className="summary-grid-section animate-fade-in">
-                            {/* 활동 그래프 */}
                             <div className="chart-card">
                                 <div className="section-header">
                                     <h3>최근 활동 추이</h3>
@@ -274,7 +285,6 @@ function MyPage() {
                                 </div>
                             </div>
 
-                            {/* 최근 토론 */}
                             <div className="recent-history-card">
                                 <div className="section-header">
                                     <h3>최근 참여한 토론</h3>
@@ -307,15 +317,22 @@ function MyPage() {
                         </div>
                     ) : (
                         <div className="badge-grid-section animate-fade-in">
-                            {/* 배지 리스트 */}
                             <div className="badge-card-container">
                                 {myBadges.map((badge) => (
-                                    <div key={badge.name} className={`badge-item ${badge.earned ? 'acquired' : 'locked'}`}>
+                                    <div 
+                                        key={badge.name} 
+                                        className={`badge-item ${badge.earned ? 'acquired' : 'locked'} ${badge.isEquipped ? 'equipped' : ''}`}
+                                        onClick={() => handleEquipBadge(badge)}
+                                        style={{ cursor: badge.earned ? 'pointer' : 'default', border: badge.isEquipped ? '2px solid var(--color-primary)' : '' }}
+                                    >
                                         <div className="badge-icon">
                                             {badge.earned ? badge.icon : "🔒"}
                                         </div>
                                         <div className="badge-info">
-                                            <div className="badge-name">{badge.name}</div>
+                                            <div className="badge-name">
+                                                {badge.name}
+                                                {badge.isEquipped && <span style={{fontSize: '0.8em', color: 'var(--color-primary)', marginLeft: '6px'}}>● 장착중</span>}
+                                            </div>
                                             <div className="badge-desc">{badge.description}</div>
                                             {badge.earned && badge.acquired_at && (
                                                 <div className="badge-date">{formatDate(badge.acquired_at)} 획득</div>

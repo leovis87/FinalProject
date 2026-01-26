@@ -54,8 +54,23 @@ export function AuthProvider({ children }) {
         }
     }
 
+    const updateEquippedBadge = (badge) => {
+        if (user) {
+            setUser({ ...user, equipped_badge: badge });
+        }
+    }
+
     return (
-        <AuthContext.Provider value={{ isAuthenticated, user, isLoading, login, logout, updateLocalNickname, refreshUser }}>
+        <AuthContext.Provider value={{ 
+            isAuthenticated, 
+            user, 
+            isLoading, 
+            login, 
+            logout, 
+            updateLocalNickname, 
+            updateEquippedBadge,
+            refreshUser 
+        }}>
             {!isLoading && children}
         </AuthContext.Provider>
     );
