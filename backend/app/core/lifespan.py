@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, datetime
 
 from .database import init_db, engine, AsyncSessionLocal
-from models.enums import AuthProvider
+from models.enums import AuthProvider, BadgeType, UserTier
 from services.user import user_service
 
 TEST_USERS = [
@@ -19,7 +19,7 @@ async def init_test_users():
     async with AsyncSessionLocal() as db:
         for user_data in TEST_USERS:
             try:
-                await user_service.get_or_create_social_user(
+                user = await user_service.get_or_create_social_user(
                     db,
                     provider=AuthProvider.TEST,
                     provider_user_id=user_data["id"],
@@ -30,6 +30,20 @@ async def init_test_users():
                     birth_date=user_data["birth_date"],
                     gender=user_data["gender"]
                 )
+
+                # 한예슬(test_user_006)에게 모든 배지 및 마스터 티어 부여
+                if user_data["id"] == "test_user_006":
+                    all_badges = [
+                        {"name": badge.value, "acquired_at": datetime.now().isoformat()}
+                        for badge in BadgeType
+                    ]
+                    user.badges = all_badges
+                    user.points = 3000
+                    user.tier = UserTier.MASTER
+                    
+                    db.add(user)
+                    await db.commit()
+
             except Exception as e:
                 print(f"테스트 유저({user_data['name']}) 생성 실패: {e}")
 
