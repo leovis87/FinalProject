@@ -34,6 +34,22 @@
     gap: 16px;
 }
 
+.header-left-group {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.mobile-menu-btn {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--text-strong);
+    cursor: pointer;
+    padding: 4px;
+}
+
 .header-badge {
     display: flex;
     align-items: center;
@@ -84,6 +100,7 @@
     flex: 1;
     overflow: hidden;
     background-color: var(--bg-color);
+    position: relative; /* 오버레이 위치 잡기 위함 */
 }
 
 /* 사이드바 */
@@ -98,6 +115,22 @@
     flex-shrink: 0;
     gap: 24px;
     overflow-y: auto;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-close-btn {
+    display: none; /* PC에서는 닫기 버튼 숨김 */
+}
+
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 150;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    backdrop-filter: blur(2px);
 }
 
 .user-info-card {
@@ -242,4 +275,86 @@ main {
     position: relative;
     display: flex;
     flex-direction: column;
+}
+
+@media (max-width: 960px) {
+    .header {
+        padding: 0 16px;
+    }
+    
+    .header.logged-in {
+        padding: 12px 16px;
+    }
+
+    .mobile-menu-btn {
+        display: flex; /* 햄버거 버튼 보이기 */
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* 사이드바를 화면 밖으로 숨김 */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 280px;
+        z-index: 200;
+        transform: translateX(-100%);
+        box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        padding-top: 80px !important; 
+    }
+    /* 사이드바 열림 상태 */
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    /* 닫기 버튼 보이기 */
+    .sidebar-close-btn {
+        display: block;
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: var(--text-muted);
+        cursor: pointer;
+    }
+
+    /* 오버레이 활성화 */
+    .sidebar-overlay.active {
+        display: block;
+        opacity: 1;
+    }
+    
+    /* 모바일에서 헤더 뱃지 일부 숨기기 (공간 부족 시) */
+    .header-badge.win {
+        display: none;
+    }
+}
+
+@media (max-width: 960px) {
+    .header-left-group {
+        gap: 12px; /* 간격 축소 */
+    }
+
+    .logo-icon {
+        width: 36px; /* 모바일 로고 사이즈 축소 */
+    }
+
+    .logo h1 {
+        font-size: 20px; /* 폰트 사이즈 축소 */
+    }
+    
+    /* 우측 뱃지 숨김 처리 (공간 확보) */
+    .header-badge.xp, 
+    .header-badge.win {
+        display: none;
+    }
+    
+    .header-badge.level {
+        padding: 4px 10px;
+        font-size: 13px;
+    }
 }

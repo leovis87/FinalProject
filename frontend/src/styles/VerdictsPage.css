@@ -359,3 +359,44 @@
         padding: 20px;
     }
 }
+
+@media (max-width: 768px) {
+    /* 필터 영역 */
+    .verdicts-filter-card {
+        padding: 20px;
+    }
+    
+    .filter-btn-group {
+        gap: 8px;
+    }
+
+    /* 카드 */
+    .verdict-card {
+        padding: 20px;
+    }
+    
+    /* 헤더 */
+    .verdict-card-header {
+        flex-direction: column; /* 아이콘과 텍스트 세로 배치 */
+        align-items: flex-start;
+        padding-right: 0;
+    }
+    
+    /* 점수 뱃지 위치 */
+    .verdict-score-badge {
+        position: static;
+        margin-bottom: 12px;
+    }
+    
+    /* 하단 푸터 (MVP 정보) */
+    .verdict-footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .verdict-date {
+        align-self: flex-end; /* 날짜는 우측 끝으로 */
+        font-size: 12px;
+    }
+}

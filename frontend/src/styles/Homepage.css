@@ -322,3 +322,34 @@
     opacity: 0; /* 초기 상태 숨김 */
     animation: fadeInUp 0.3s ease-out 0.15s forwards; /* 0.15초 딜레이 */
 }
+
+@media (max-width: 768px) {
+    .banner-card.battle-banner {
+        padding: 24px;
+        align-items: flex-start; /* 왼쪽 정렬 */
+    }
+
+    .banner-text h2 {
+        font-size: 28px;
+    }
+
+    .banner-desc {
+        font-size: 14px;
+    }
+
+    .banner-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .banner-action-btn {
+        width: 100%;
+        justify-content: center;
+        font-size: 16px;
+    }
+    
+    /* 공지사항/팁 카드 */
+    .info-grid-section {
+        grid-template-columns: 1fr; /* 1열 배치 */
+    }
+}

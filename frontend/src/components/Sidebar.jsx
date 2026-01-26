@@ -1,10 +1,11 @@
 import { NavLink } from "react-router-dom";
-import { RiHome4Line, RiUser3Line, RiDashboardLine } from "react-icons/ri";
+import { RiHome4Line, RiUser3Line, RiDashboardLine, RiCloseLine } from "react-icons/ri"; // RiCloseLine 추가
 import { useAuth } from "../contexts/AuthContext";
 import Avatar from "./Avatar";
 import "../styles/Sidebar.css";
 
-function Sidebar() {
+// isOpen, onClose props 추가
+function Sidebar({ isOpen, onClose }) {
     const { user } = useAuth();
 
     const maxExp = user?.next_level_exp || 100;
@@ -12,7 +13,14 @@ function Sidebar() {
     const expPercentage = Math.min((currentExp / maxExp) * 100, 100);
 
     return (
-        <div className="sidebar">
+        // 모바일 상태 클래스 추가
+        <div className={`sidebar ${isOpen ? 'open' : ''}`}>
+            
+            {/* 모바일용 닫기 버튼 */}
+            <button className="sidebar-close-btn" onClick={onClose}>
+                <RiCloseLine />
+            </button>
+
             {/* 유저 정보 카드 영역 */}
             <div className="user-info-card">
                 {user ? (
@@ -23,23 +31,15 @@ function Sidebar() {
                             </div>
                             <div className="sidebar-profile-text">
                                 <div className="sidebar-nickname">{user.nickname}</div>
-                                {/* 레벨과 배지를 한 줄에 배치 */}
                                 <div className="sidebar-status-row" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                                     <div className="sidebar-level-badge">
                                         Lv. {user.level || 1}
                                     </div>
                                     {user.equipped_badge && (
                                         <div className="sidebar-equipped-badge" style={{
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '4px',
-                                            padding: '2px 8px',
-                                            borderRadius: '10px',
-                                            backgroundColor: '#f8fafc',
-                                            border: '1px solid #cbd5e1',
-                                            fontSize: '0.75rem',
-                                            color: '#475569',
-                                            fontWeight: '600'
+                                            display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px',
+                                            borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1',
+                                            fontSize: '0.75rem', color: '#475569', fontWeight: '600'
                                         }}>
                                             <span>{user.equipped_badge.icon}</span>
                                             <span>{user.equipped_badge.name}</span>
@@ -104,4 +104,4 @@ function Sidebar() {
         </div>
     )
 }
-export default Sidebar
+export default Sidebar;
