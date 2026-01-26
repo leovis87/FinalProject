@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from datetime import datetime
 
 from models.user import User
@@ -68,8 +69,8 @@ class UserService:
         return user
     
     async def get_by_id(self, db: AsyncSession, user_id: int) -> User | None:
-        """ID로 사용자 조회"""
-        query = select(User).where(User.user_id == user_id)
+        """ID로 사용자 조회 (참여 기록 포함)"""
+        query = select(User).options(selectinload(User.participations)).where(User.user_id == user_id)
         result = await db.execute(query)
         return result.scalar_one_or_none()
     

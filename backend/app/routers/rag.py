@@ -6,7 +6,7 @@ from rag.indexer import load_artifacts
 from rag.embedder import embed_query
 from rag.orchestrator import generate_topics_with_fallback
 
-router = APIRouter(prefix="/rag", tags=["RAG"])
+router = APIRouter(prefix="/api/rag", tags=["RAG"])
 
 index, docs = load_artifacts()
 

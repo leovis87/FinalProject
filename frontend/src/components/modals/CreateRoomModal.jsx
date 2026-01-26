@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { debateApi } from '../../api/debateApi';
 import "../../styles/CreateRoomModal.css"
 
 function CreateRoomModal({ onClose }) {
@@ -56,35 +57,21 @@ function CreateRoomModal({ onClose }) {
         setRecommendedTopics([]);
 
         try {
-            const token = localStorage.getItem("access_token");
-            const response = await fetch("/rag/topics/generate", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    user_query: formData.topic,   // 사용자가 입력한 키워드
-                    level: formData.level,        // 선택된 학년/난이도
-                    subject: formData.category,   // 선택된 카테고리
-                    n_topics: 3                   // 추천받을 주제 개수
-                })
+            const data = await debateApi.getAiRecommendations({
+                user_query: formData.topic,
+                level: formData.level,
+                subject: formData.category,
+                n_topics: 3
             });
 
-            if (response.ok) {
-                const data = await response.json();
-                if (data.topics && data.topics.length > 0) {
-                    setRecommendedTopics(data.topics);
-                } else {
-                    alert("적절한 토론 주제를 찾지 못했습니다. 다른 키워드로 시도해보세요.");
-                }
+            if (data.topics?.length > 0) {
+                setRecommendedTopics(data.topics);
             } else {
-                console.error("AI Recommendation failed");
-                alert("주제 추천 중 오류가 발생했습니다.");
+                alert("적절한 주제를 찾지 못했습니다.");
             }
         } catch (err) {
             console.error(err);
-            alert("서버 통신 오류가 발생했습니다.");
+            alert("주제 추천 중 오류가 발생했습니다.");
         } finally {
             setIsRecommending(false);
         }
@@ -122,35 +109,15 @@ function CreateRoomModal({ onClose }) {
         setIsSubmitting(true);
 
         try {
-            const token = localStorage.getItem("access_token");
-            const response = await fetch("/api/debates/", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                alert("토론방이 생성되었습니다!");
-                onClose();
-                navigate(`/debate/room/${data.debate_room_id}`);
-            } else {
-                const errData = await response.json();
-                if (Array.isArray(errData.detail)) {
-                    const errorMsg = errData.detail.map(err =>
-                        `${err.loc[err.loc.length - 1]}: ${err.msg}"`
-                    ).join('\n');
-                    setError(errorMsg);
-                } else {
-                    setError(errData.detail || "토론방 생성에 실패했습니다.");
-                }
-            }
+            const data = await debateApi.createRoom(formData);
+            alert("토론방이 생성되었습니다!");
+            onClose();
+            navigate(`/debate/room/${data.debate_room_id}`);
         } catch (err) {
-            console.error(err);
-            setError("서버 오류가 발생했습니다.");
+            // Axios 에러 객체 처리
+            const errorMsg = err.response?.data?.detail || "토론방 생성 실패";
+            // detail이 배열인 경우(Pydantic validation error) 처리 로직은 별도 유틸 함수로 빼면 더 좋습니다.
+            setError(Array.isArray(errorMsg) ? JSON.stringify(errorMsg) : errorMsg);
         } finally {
             setIsSubmitting(false);
         }

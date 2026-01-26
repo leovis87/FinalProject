@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { userApi } from '../api/userApi';
 
 const AuthContext = createContext();
 
@@ -9,19 +10,9 @@ export function AuthProvider({ children }) {
 
    const fetchMe = useCallback(async (token) => {
         try {
-            // 외부 IP 대신 상대 경로 사용 (Vite 프록시 활용)
-            const response = await fetch("/api/users/me", {
-                headers: {
-                    "Authorization": `Bearer ${token}`
-                }
-            });
-            if (response.ok) {
-                const userData = await response.json();
-                setUser(userData);
-                setIsAuthenticated(true);
-            } else {
-                logout();
-            }
+            const userData = await userApi.getMe(); 
+            setUser(userData);
+            setIsAuthenticated(true);
         } catch (error) {
             console.error("Failed to fetch user:", error);
             logout();

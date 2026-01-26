@@ -25,7 +25,7 @@ function JoinRoomModal({ room, onClose }) {
 
             // 참가자 입장
             const token = localStorage.getItem("access_token");
-            const response = await etch(`/api/debates/${room.debate_room_id}/join?role=${role}`, {
+            const response = await fetch(`/api/debates/${room.debate_room_id}/join?role=${role}`, {
                 method: "POST",
                 headers: { "Authorization": `Bearer ${token}` }
             });

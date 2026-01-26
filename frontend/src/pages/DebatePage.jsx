@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { debateApi } from '../api/debateApi';
 import { io } from "socket.io-client";
 import { 
     RiSendPlaneFill, 
@@ -52,27 +53,14 @@ function DebatePage() {
     useEffect(() => {
         const fetchRoom = async () => {
             try {
-                const token = localStorage.getItem("access_token");
-                const response = await fetch(`/api/debates/${roomId}`, {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    setRoom(data);
-                    // 방 상태가 진행 중이면 debateStarted를 true로 설정하여 입력창 활성화
-                    if (data.status !== "waiting") {
-                        setDebateStarted(true);
-                    }
-                    if (data.status === "finished") {
-                        setDebateEnded(true);
-                    }
-                } else {
-                    setError("방 정보를 불러오지 못했습니다.");
-                }
+                const data = await debateApi.getRoomInfo(roomId);
+            
+                setRoom(data);
+                if (data.status !== "waiting") setDebateStarted(true);
+                if (data.status === "finished") setDebateEnded(true);
             } catch (err) {
                 console.error(err);
-                setError("서버 통신 오류");
+                setError("방 정보를 불러오지 못했습니다.");
             }
         };
         fetchRoom();

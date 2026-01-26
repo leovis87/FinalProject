@@ -1,100 +1,31 @@
+.layout-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
 /* 헤더 */
 .header {
     display: flex;
     align-items: center;
     height: 72px;
-    background-color: var(--bg-color);
+    background-color: var(--color-surface);
     padding: 0 32px;
     transition: all 0.2s ease;
     justify-content: center;
     z-index: 100;
     position: relative;
-    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
 }
 
 .header.logged-in {
     height: auto;
     background-color: var(--surface-color);
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 5px solid var(--color-primary);
     justify-content: space-between;
     padding: 16px 24px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
-}
-
-.header-left-profile {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.profile-avatar {
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
-    background-color: #f1f5f9;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border: 1px solid var(--border-color);
-}
-
-.profile-info {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.profile-name {
-    font-size: 22px;
-    font-weight: 800;
-    color: var(--text-strong);
-}
-
-.level-bar-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--text-muted);
-}
-
-.level-divider {
-    width: 2px;
-    height: 14px;
-    background-color: #cbd5f5;
-    margin-right: 2px;
-}
-
-.progress-track {
-    width: 240px;
-    height: 16px;
-    background-color: #e2e8f0;
-    border-radius: 999px;
-    overflow: hidden;
-    position: relative;
-}
-
-.progress-fill {
-    height: 100%;
-    background-color: var(--point-sub-color);
-    border-radius: 999px;
-    width: 0%;
-}
-
-.xp-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 11px;
-    font-weight: 700;
-    color: #0f172a;
-    z-index: 2;
-    line-height: 1;
+    box-shadow: var(--shadow-card);
 }
 
 .header-right-tools {
@@ -103,128 +34,212 @@
     gap: 16px;
 }
 
-.resource-display {
-    display: flex;
-    gap: 16px;
-    background-color: transparent;
-}
-
-.resource-item {
+.header-badge {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-weight: 700;
-    font-size: 16px;
-    color: var(--text-strong);
-}
-
-.icon-actions {
-    display: flex;
-    gap: 10px;
-}
-
-.icon-btn {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    border: 1px solid var(--border-color);
+    padding: 6px 16px;
+    border-radius: 999px;
+    border: 2px solid transparent;
     background-color: #fff;
-    color: var(--text-muted);
-    cursor: pointer;
+    font-size: 14px;
+    font-weight: 800;
+    white-space: nowrap;
+    transition: transform 0.2s ease;
+}
+
+.header-badge:hover {
+    transform: translateY(-2px);
+}
+
+.header-badge-icon {
+    font-size: 18px;
+    margin-bottom: 2px;
+}
+
+.header-badge.level {
+    border-color: #facc15;
+    background-color: #fefce8;
+    color: #854d0e;
+}
+
+.header-badge.level .badge-icon {
+    color: #eab308;
+}
+
+.header-badge.xp {
+    border-color: #1e3a8a;
+    background-color: #eff6ff;
+    color: #1e3a8a;
+}
+
+.header-badge.win {
+    border-color: #00c060;
+    background-color: #f0fdf4;
+    color: #007a3d;
+}
+
+.content-wrapper {
     display: flex;
-    justify-content: center;
-    align-items: center;
-    transition: all 0.2s ease;
+    flex: 1;
+    overflow: hidden;
+    background-color: var(--bg-color);
 }
 
-.icon-btn:hover {
-    background-color: #f8fafc;
-    color: var(--text-strong);
-    border-color: #cbd5f5;
-}
-
-.icon-btn:focus-visible {
-    outline: 3px solid rgba(37, 99, 235, 0.3);
-    outline-offset: 2px;
-}
-
-.header-logo-center {
-    display: flex;
-    align-items: center;
-}
-
-@media (max-width: 1024px) {
-    .progress-track {
-        width: 180px;
-    }
-}
-
-@media (max-width: 768px) {
-    .header {
-        padding: 0 16px;
-    }
-
-    .header.logged-in {
-        padding: 12px 16px;
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .header-right-tools {
-        width: 100%;
-        justify-content: space-between;
-    }
-}
-
-/* 푸터 */
-.footer {
-    background-color: #0f172a;
-    color: #94a3b8;
-    padding: 48px 20px;
-    font-size: 13px;
-    margin-top: auto;
-}
-
-.footer-content {
-    max-width: 1200px;
-    margin: 0 auto;
+/* 사이드바 */
+.sidebar {
+    width: 300px;
+    height: 100%;
+    background-color: var(--color-surface);
+    border-right: var(--card-border);
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    padding: 24px 16px;
+    flex-shrink: 0;
+    gap: 24px;
+    overflow-y: auto;
 }
 
-.footer-links {
+.user-info-card {
+    background-color: #f8fafc;
+    border: var(--card-border);
+    border-radius: 16px;
+    padding: 16px;
     display: flex;
-    gap: 20px;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
 }
 
-.footer-links a {
-    color: #cbd5f5;
-    transition: color 0.2s;
+.user-profile-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
-.footer-links a:hover {
-    color: #fff;
-    text-decoration: underline;
-}
-
-.footer-info p {
-    margin-bottom: 8px;
-    line-height: 1.5;
-}
-
-.header-tier {
-    margin-left: 8px;
-    padding: 2px 8px;
-    font-size: 11px; /* 헤더에 맞춰 조금 더 작게 조절 */
-    vertical-align: middle;
-}
-
-/* 기존 티어 색상 정의 유지 */
-.tier-badge {
+.sidebar-avatar {
+    width: 48px;
+    height: 48px;
     border-radius: 12px;
-    font-weight: bold;
-    border: 1px solid transparent;
+    overflow: hidden;
+    background-color: #fff;
+    border: 1px solid #e2e8f0;
+    flex-shrink: 0;
 }
-.tier-옹알이 { background: #f1f5f9; color: #64748b; border-color: #cbd5e1; }
-.tier-입문자 { background: #ecfdf5; color: #059669; border-color: #a7f3d0; }
+
+.sidebar-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.sidebar-profile-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.sidebar-nickname {
+    font-size: 20px;
+    font-weight: 800;
+    color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-level-badge {
+    display: inline-flex;
+    align-items: center;
+    background-color: rgba(37, 99, 235, 0.1);
+    color: var(--point-main-color, #2563eb);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+    width: fit-content;
+}
+
+.sidebar-xp-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sidebar-xp-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.sidebar-xp-track {
+    width: 100%;
+    height: 10px;
+    background-color: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.sidebar-xp-fill {
+    height: 100%;
+    background-color: var(--color-secondary);
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+
+.sidebar-loading {
+    font-size: 13px;
+    color: #94a3b8;
+    text-align: center;
+    padding: 10px 0;
+}
+
+.sidebar-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    border: 2px solid #e4e6ea;
+    border-radius: 10px;
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-decoration: none;
+}
+
+.menu-item:hover {
+    background-color: #f8fafc;
+    color: var(--text-strong);
+}
+
+.menu-item.active {
+    background-color: var(--color-primary);
+    border: 2px solid var(--color-primary);
+    color: var(--text-white);
+    font-weight: 700;
+    box-shadow: var(--shadow-under);
+}
+
+.menu-icon {
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+main {
+    flex: 1;
+    overflow-y: auto;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}

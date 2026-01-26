@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Response, Depends, Body
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
@@ -62,7 +63,11 @@ async def get_test_users(db: AsyncSession = Depends(get_db)):
     """
     [개발용] 로그인 가능한 테스트 유저 목록 조회
     """
-    query = select(User).where(User.provider == AuthProvider.TEST)
+    query = (
+        select(User)
+        .options(selectinload(User.participations))
+        .where(User.provider == AuthProvider.TEST)
+    )
     result = await db.execute(query)
     users = result.scalars().all()
     return users
@@ -88,7 +93,7 @@ async def test_login(
     [개발용] 테스트 계정 로그인
     """
     # 1. 이메일로 테스트 유저 조회
-    query = select(User).where(
+    query = select(User).options(selectinload(User.participations)).where(
         User.provider == AuthProvider.TEST,
         User.email == body.email
     )

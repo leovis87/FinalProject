@@ -617,8 +617,8 @@ class DebateService:
         mapping = {
             DebateCategory.KOREAN: "국어",
             DebateCategory.SOCIAL: "사회",
+            DebateCategory.SCIENCE: "과학",
             DebateCategory.MORAL: "도덕",
-            DebateCategory.ETHICS: "도덕",
         }
         if category is None:
             return None
@@ -628,8 +628,8 @@ class DebateService:
         mapping = {
             "국어": DebateCategory.KOREAN,
             "사회": DebateCategory.SOCIAL,
+            "과학": DebateCategory.SCIENCE,
             "도덕": DebateCategory.MORAL,
-            "윤리": DebateCategory.ETHICS,
         }
         return mapping.get(subject, DebateCategory.KOREAN)
 
