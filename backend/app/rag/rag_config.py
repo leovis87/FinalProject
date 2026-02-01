@@ -20,7 +20,7 @@ METAS_PATH = os.path.join(ARTIFACT_DIR, "metas.json")
 # ?? 키/모델 설정(환경변수로 주입)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 
 # 폴백 게이트 조건(환경변수로 조정 가능)
@@ -30,5 +30,5 @@ MIN_WEB_HITS = int(os.getenv("MIN_WEB_HITS", "3"))
 WEB_TOPN = int(os.getenv("WEB_TOPN", "6"))
 
 # 웹 검색(???) 설정
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "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")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 TAVILY_SEARCH_DEPTH = os.getenv("TAVILY_SEARCH_DEPTH", "basic")
