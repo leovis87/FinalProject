@@ -52,19 +52,16 @@
 
 ```
 [Client (Web)]
-↓ (HTTP / WebSocket)
-[Backend API (FastAPI)]
-↓
-[AI / Logic Server]
-├─ LangGraph (토론 플로우)
-├─ LLM (사회자 / 판정자 / 욕설 비방 탐지)
-└─ RAG (주제 생성)
+↓ (HTTP / Socket.IO)
+[Backend (FastAPI + Socket.IO)]
+├─ LangGraph (요약/심판/판정/피드백)
+└─ RAG (주제 추천)
 ↓
 [PostgreSQL]
 ```
 
 - **Frontend**: React, Vite  
-- **Backend**: FastAPI, WebSocket  
+- **Backend**: FastAPI, Socket.IO  
 - **AI / Logic**: LangGraph, LLM(OpenAI/Gemini), RAG  
 - **DB**: PostgreSQL 
 
@@ -77,16 +74,13 @@
 - 토론 결과 및 피드백 확인
 
 ### 🛠 관리자 기능
-- 토론 로그 조회
-- 토론 결과 및 평가 데이터 관리
-- AI 판정 결과 검수
+- (코드 기준) 별도 관리자 기능은 미구현
 
 ### 🤖 AI 기능
-- RAG 기반 토론 주제 자동 생성
-- 욕설·비방·모욕 발언 전처리
+- RAG 기반 토론 주제 추천
 - 토론 단계별 요약 (입론/반론/최종발언)
-- 웹 기반 팩트체킹
-- 승·패 강제 판정 및 팀/개인별 피드백 생성
+- 심판(욕설/비방/논점 이탈) 경고
+- 최종 판정 및 팀/개인별 피드백 생성
 
 ---
 
@@ -129,7 +123,7 @@
 📦 project-root
 ┣ 📂 frontend
 ┣ 📂 backend
-┣ 📂 shared
+┣ 📂 experiments
 ┗ README.md
 ```
 
@@ -139,7 +133,7 @@
 
 ### ▶ Backend
 ```bash
-uvicorn main:app --reload
+uvicorn backend.app.main:app --reload
 ```
 
 ### ▶ Frontend
@@ -148,10 +142,8 @@ npm install
 npm run dev
 ```
 
-### ▶ AI Server (선택)
-```bash
-python main.py
-```
+### ▶ Socket.IO
+- FastAPI 앱에 `/socket.io`로 마운트되어 별도 실행 불필요
 
 ---
 
@@ -180,17 +172,3 @@ python main.py
 - AI 참가자 기능 추가 
 
 ---
-
-## 1️⃣2️⃣ 회고 (Retrospective)
-
-- 프로젝트를 통해 얻은 점:
-  -  
-  -  
-
----
-
-## 1️⃣3️⃣ 참고 자료 (References)
-
-- LangGraph 공식 문서 
-- OpenAI / Gemini API 문서
-- RAG 관련 기술 블로그 
