@@ -155,7 +155,7 @@ npm run dev
 | 단해민| 프론트엔드 / 벡엔드 |
 | 권나영| 프론트엔드 / 벡엔드 / RAG|
 | 이재철| LangGraph / Prompting |
-| 김진우| AI 로직 / LangGraph |
+| 김진우| AI 로직 / LangGraph / Prompting / Deep research |
 ---
 
 ## 1️⃣1️⃣ 한계점 & 개선 방향 (Limitations & Future Work)
